@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ProSketch Studio 🎨</title>
+    <link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#6366f1">
+<link rel="apple-touch-icon" href="./icon-192.png">
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --accent: #4ECDC4;
+            --danger: #ef4444;
+            --bg: #f8fafc;
+            --glass: rgba(255, 255, 255, 0.85);
+            --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; select: none; user-select: none; }
+        
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #e0e7ff;
+            background-image: radial-gradient(#6366f1 1px, transparent 1px);
+            background-size: 20px 20px;
+            font-family: 'Fredoka', sans-serif;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* --- VIEWPORT & CANVAS --- */
+        #viewport {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            position: relative;
+            touch-action: none;
+            cursor: crosshair;
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 0; left: 0;
+            background: white;
+            box-shadow: 0 0 50px rgba(0,0,0,0.15);
+            transform-origin: 0 0;
+        }
+
+        /* Symmetry Guides */
+        .sym-guide {
+            position: absolute;
+            background: rgba(99, 102, 241, 0.3);
+            pointer-events: none;
+            display: none;
+            z-index: 10;
+        }
+        #sym-guide-x { top: 0; bottom: 0; left: 50%; width: 2px; transform: translateX(-50%); }
+        #sym-guide-y { left: 0; right: 0; top: 50%; height: 2px; transform: translateY(-50%); }
+
+        /* --- UI OVERLAY --- */
+        .ui-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; /* Let clicks pass through to canvas */
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .pointer-auto { pointer-events: auto; }
+
+        /* Top Bar */
+        .top-bar {
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo { font-size: 24px; font-weight: 600; color: var(--primary); text-shadow: 2px 2px 0px white; }
+
+        .btn-icon {
+            background: white;
+            width: 44px; height: 44px;
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            cursor: pointer;
+            transition: transform 0.1s, background 0.2s;
+            border: 2px solid white;
+        }
+        .btn-icon:active { transform: scale(0.9); }
+        .btn-icon:hover { background: #f1f5f9; }
+
+        /* Draggable Pencil Case */
+        #pencil-case-container {
+            position: absolute;
+            left: 20px; top: 80px;
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            padding: 10px;
+            border-radius: 50px;
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: width 0.3s, height 0.3s;
+            border: 2px solid white;
+            touch-action: none; /* Crucial for dragging */
+        }
+
+        #case-toggle {
+            width: 50px; height: 50px;
+            background: #FFD93D;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px;
+            cursor: move;
+            z-index: 2;
+            box-shadow: 0 4px 10px rgba(255, 217, 61, 0.4);
+            user-select: none;
+        }
+
+        #case-items {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            height: 0;
+            opacity: 0;
+            overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            margin-top: 0;
+        }
+
+        #case-items.open {
+            height: auto;
+            opacity: 1;
+            padding-bottom: 10px;
+        }
+
+        .case-tool {
+            width: 40px; height: 40px;
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px;
+            cursor: pointer;
+            background: white;
+            transition: 0.2s;
+        }
+        .case-tool.active { background: var(--primary); color: white; transform: scale(1.1); }
+
+        /* Bottom Controls */
+        .bottom-bar {
+            padding: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(to top, rgba(255,255,255,0.9), transparent);
+        }
+
+        .control-group {
+            background: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .color-swatch {
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+        .color-swatch:hover { transform: scale(1.2); }
+        
+        #curr-color { 
+            width: 36px; height: 36px; 
+            border: 3px solid white; 
+            box-shadow: 0 0 0 2px #e2e8f0; 
+        }
+
+        input[type=range] {
+            width: 100px;
+            accent-color: var(--primary);
+        }
+
+        /* Side Panel (Layers/Settings) */
+        #main-panel {
+            position: absolute;
+            top: 10px; right: -320px; bottom: 10px;
+            width: 300px;
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(15px);
+            border-radius: 20px;
+            box-shadow: -10px 0 30px rgba(0,0,0,0.1);
+            transition: right 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex;
+            flex-direction: column;
+            z-index: 150;
+        }
+        #main-panel.active { right: 10px; }
+
+        .panel-header {
+            padding: 20px;
+            border-bottom: 2px solid #f1f5f9;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .panel-header h3 { margin: 0; color: #334155; }
+        .close-panel { cursor: pointer; color: #94a3b8; font-size: 20px; }
+
+        #panel-content { flex: 1; overflow-y: auto; padding: 20px; }
+
+        /* Studio Buttons */
+        .btn-filter {
+            padding: 10px;
+            border: 2px solid #e2e8f0;
+            background: white;
+            border-radius: 12px;
+            font-weight: 600;
+            color: #475569;
+            cursor: pointer;
+            transition: 0.2s;
+            font-family: inherit;
+        }
+        .btn-filter:hover { background: #f1f5f9; border-color: var(--primary); color: var(--primary); }
+
+        .layer-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            border: 2px solid #f1f5f9;
+            cursor: pointer;
+        }
+        .layer-item.active { border-color: var(--primary); background: #e0e7ff; }
+        .layer-vis { cursor: pointer; opacity: 0.5; }
+        .layer-vis:hover { opacity: 1; }
+
+        /* Modals */
+        .modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+            z-index: 200;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal.active { display: flex; animation: fadeIn 0.3s; }
+        .modal-box {
+            background: white;
+            width: 90%; max-width: 600px;
+            max-height: 85vh;
+            border-radius: 24px;
+            padding: 20px;
+            overflow-y: auto;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            animation: slideUp 0.3s;
+        }
+
+        #gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .gallery-card {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 8px;
+            border: 1px solid #e2e8f0;
+        }
+        .gallery-card img { width: 100%; border-radius: 8px; margin-bottom: 5px; }
+        .gallery-actions { display: flex; justify-content: space-between; font-size: 12px; color: #64748b; }
+
+        .template-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+        .template-btn {
+            background: #f1f5f9;
+            border: none;
+            padding: 15px;
+            border-radius: 12px;
+            font-family: inherit;
+            font-weight: 600;
+            color: #475569;
+            cursor: pointer;
+            text-align: left;
+        }
+        .template-btn:hover { background: #e2e8f0; }
+    /* --- PWA INSTALL POPUP --- */
+#pwa-install-prompt {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(150px); /* Hidden by default */
+    width: 90%;
+    max-width: 400px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(15px);
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    border: 2px solid white;
+    z-index: 1000;
+    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    text-align: center;
+}
+
+#pwa-install-prompt.show {
+    transform: translateX(-50%) translateY(0);
+}
+
+.pwa-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    text-align: left;
+}
+
+.pwa-icon-placeholder {
+    width: 50px;
+    height: 50px;
+    background: var(--primary);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: white;
+}
+
+.pwa-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 5px;
+}
+
+.btn-pwa {
+    flex: 1;
+    padding: 12px;
+    border-radius: 12px;
+    border: none;
+    font-family: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.btn-pwa.primary {
+    background: var(--primary);
+    color: white;
+    box-shadow: 0 4px 10px rgba(99, 102, 241, 0.3);
+}
+
+.btn-pwa.secondary {
+    background: #f1f5f9;
+    color: #64748b;
+}
+        /* Toast */
+        #toast {
+            position: fixed;
+            top: 20px; left: 50%; transform: translateX(-50%) translateY(-100px);
+            background: #1e293b;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-weight: 600;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 300;
+            display: flex; align-items: center; gap: 8px;
+        }
+        #toast.show { transform: translateX(-50%) translateY(0); }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <div id="viewport">
+        <div id="canvas-container">
+            <canvas id="main-canvas"></canvas>
+            <div id="sym-guide-x" class="sym-guide"></div>
+            <div id="sym-guide-y" class="sym-guide"></div>
+        </div>
+    </div>
+
+    <div class="ui-layer">
+        
+        <div class="top-bar pointer-auto">
+            <div style="display:flex; gap:10px;">
+                <div class="btn-icon" onclick="app.loadState()" title="Load Save">📂</div>
+                <div class="btn-icon" onclick="app.toggleTemplateModal()" title="Templates">🧩</div>
+            </div>
+            
+            <div class="logo">ProSketch Studio</div>
+
+            <div style="display:flex; gap:10px;">
+                <div class="btn-icon" onclick="app.undo()">↩️</div>
+                <div class="btn-icon" onclick="app.redo()">↪️</div>
+            </div>
+        </div>
+
+        <div id="pencil-case-container" class="pointer-auto">
+            <div id="case-toggle">✏️</div>
+            <<div id="case-items">
+    <div class="case-tool active" id="t-pen" onclick="app.setTool('pen')">🖊️</div>
+    <div class="case-tool" id="t-pencil" onclick="app.setTool('pencil')">✏️</div>
+    <div class="case-tool" id="t-brush" onclick="app.setTool('brush')">🖌️</div>
+    <div class="case-tool" id="t-marker" onclick="app.setTool('marker')">🖍️</div>
+    <div class="case-tool" id="t-neon" onclick="app.setTool('neon')">✨</div>
+    <div class="case-tool" id="t-eraser" onclick="app.setTool('eraser')">🧼</div>
+</div> 
+        </div>
+
+        <div class="bottom-bar pointer-auto">
+            <div class="btn-icon" onclick="app.toggleProps('settings')" style="background:#fff;">⚙️</div>
+
+            <div class="control-group">
+                <div id="curr-color" class="color-swatch" onclick="app.togglePicker()"></div>
+                <div class="color-swatch" style="background:#ef4444" onclick="app.setColor('#ef4444')"></div>
+                <div class="color-swatch" style="background:#f97316" onclick="app.setColor('#f97316')"></div>
+                <div class="color-swatch" style="background:#eab308" onclick="app.setColor('#eab308')"></div>
+                <div class="color-swatch" style="background:#22c55e" onclick="app.setColor('#22c55e')"></div>
+                <div class="color-swatch" style="background:#3b82f6" onclick="app.setColor('#3b82f6')"></div>
+                <div class="color-swatch" style="background:#a855f7" onclick="app.setColor('#a855f7')"></div>
+                <div class="color-swatch" style="background:#000000" onclick="app.setColor('#000000')"></div>
+
+                <div style="width:1px; height:24px; background:#e2e8f0; margin:0 5px;"></div>
+
+                <span style="font-size:12px;">Size</span>
+                <input type="range" id="size-slider" min="1" max="100" value="10" oninput="app.updateSettings('size', this.value)">
+            </div>
+
+            <div class="btn-icon" onclick="app.toggleProps('layers')" style="background:#fff;">📄</div>
+        </div>
+    </div>
+
+    <div id="main-panel" class="pointer-auto">
+        <div class="panel-header">
+            <h3 id="panel-title">Options</h3>
+            <span class="close-panel" onclick="app.toggleProps()">✕</span>
+        </div>
+        <div id="panel-content"></div>
+    </div>
+
+    <div id="gallery-modal" class="modal">
+        <div class="modal-box pointer-auto">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h2>My Art Gallery 🎨</h2>
+                <div class="btn-icon" onclick="app.toggleGalleryModal(false)">✕</div>
+            </div>
+            
+            <label for="import-file" style="display:block; margin:15px 0; padding:15px; border:2px dashed #cbd5e1; border-radius:12px; text-align:center; color:#64748b; cursor:pointer;">
+                Tap here to Import Image 📷
+            </label>
+            <input type="file" id="import-file" style="display:none;" accept="image/*" onchange="app.handleUpload(this)">
+
+            <div id="gallery-grid"></div>
+        </div>
+    </div>
+
+    <div id="template-modal" class="modal" style="display:none;">
+        <div class="modal-box pointer-auto">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h2>Fun Activities 🧩</h2>
+                <div class="btn-icon" onclick="app.toggleTemplateModal(false)">✕</div>
+            </div>
+
+            <h4 style="color:#64748b; margin:10px 0;">Tracing Practice (Dotted Lines)</h4>
+            <div class="template-grid">
+                <button class="template-btn" onclick="app.loadTemplate('line-h')">Straight Lines ➖</button>
+                <button class="template-btn" onclick="app.loadTemplate('line-z')">Zig Zags ⚡</button>
+                <button class="template-btn" onclick="app.loadTemplate('line-w')">Ocean Waves 🌊</button>
+                <button class="template-btn" onclick="app.loadTemplate('line-l')">Loop de Loop ➰</button>
+                <button class="template-btn" onclick="app.loadTemplate('shape-circle')">Big Circle ⭕</button>
+                <button class="template-btn" onclick="app.loadTemplate('shape-star')">Super Star ⭐</button>
+            </div>
+
+            <h4 style="color:#64748b; margin:20px 0 10px;">Coloring Pages</h4>
+            <div class="template-grid">
+                <button class="template-btn" onclick="app.loadTemplate('color-sun')">Sunny Day ☀️</button>
+                <button class="template-btn" onclick="app.loadTemplate('color-flower')">Flower Power 🌸</button>
+                <button class="template-btn" onclick="app.loadTemplate('color-fish')">Fishy Friend 🐠</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast"></div>
+        <div id="pwa-install-prompt">
+    <div class="pwa-header">
+        <div class="pwa-icon-placeholder">🎨</div> <div>
+            <h3 style="margin:0; color:#1e293b;">Install App</h3>
+            <p style="margin:4px 0 0; color:#64748b; font-size:13px;">Get the full screen experience!</p>
+        </div>
+    </div>
+    <div class="pwa-actions">
+        <button class="btn-pwa secondary" onclick="dismissInstall()">Not Now</button>
+        <button class="btn-pwa primary" onclick="installPWA()">Install</button>
+    </div>
+</div>
+
+    <script type="module" src="app.js"></script>
+        <script>
+    // Register Service Worker
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js')
+                .then(reg => console.log('SW Registered'))
+                .catch(err => console.log('SW Failed', err));
+        });
+    }
+
+    // PWA Install Logic
+    let deferredPrompt;
+    const pwaModal = document.getElementById('pwa-install-prompt');
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        // Prevent Chrome 67 and earlier from automatically showing the prompt
+        e.preventDefault();
+        // Stash the event so it can be triggered later.
+        deferredPrompt = e;
+        // Show the prompt
+        setTimeout(() => pwaModal.classList.add('show'), 3000); // Delay slightly for effect
+    });
+
+    async function installPWA() {
+        if (!deferredPrompt) return;
+        
+        pwaModal.classList.remove('show');
+        deferredPrompt.prompt();
+        
+        const { outcome } = await deferredPrompt.userChoice;
+        console.log(`User response to the install prompt: ${outcome}`);
+        deferredPrompt = null;
+    }
+
+    function dismissInstall() {
+        pwaModal.classList.remove('show');
+    }
+
+    window.addEventListener('appinstalled', () => {
+        pwaModal.classList.remove('show');
+        deferredPrompt = null;
+        console.log('PWA was installed');
+    });
+</script>
+
+</body>
+</html>
