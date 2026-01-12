@@ -602,82 +602,55 @@ body {
 
     <script type="module" src="app.js"></script>
                 <script>
-    // 1. Register Service Worker
+    // --- FORCE RESET SERVICE WORKER ---
+    // This forces the browser to delete the old cached files and get the new ones.
     if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            for(let registration of registrations) {
+                registration.unregister(); // DELETE OLD SW
+            }
+        });
+        
+        // Re-register the new one with a cache-busting timestamp
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js')
-                .then(reg => console.log('SW Registered'))
+            navigator.serviceWorker.register('./sw.js?v=' + Date.now())
+                .then(reg => console.log('New SW Registered'))
                 .catch(err => console.log('SW Failed', err));
         });
     }
 
-    // 2. Install Logic
+    // --- YOUR APP LOGIC ---
     let deferredPrompt;
     const pwaModal = document.getElementById('pwa-install-prompt');
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
 
-    // A. If already installed, hide everything
     if (isStandalone) {
         pwaModal.style.display = 'none';
-    } 
-    // B. iOS Handling (Manual Instructions)
-    else if (isIOS) {
+    } else if (isIOS) {
         document.querySelector('#pwa-install-prompt h3').textContent = "Install on iOS";
         document.querySelector('#pwa-install-prompt p').textContent = "Tap Share ⬆️ -> Add to Home Screen ➕";
-        document.querySelector('.btn-pwa.primary').style.display = 'none'; // Hide button on iOS
-        
-        setTimeout(() => {
-            pwaModal.classList.add('show');
-        }, 3000);
+        document.querySelector('.btn-pwa.primary').style.display = 'none';
+        setTimeout(() => pwaModal.classList.add('show'), 3000);
     }
 
-    // C. Android/Windows Handling (The "Install" Button)
     window.addEventListener('beforeinstallprompt', (e) => {
-        // Prevent Chrome from hiding the event
         e.preventDefault();
-        // Save the event for later (CRITICAL)
         deferredPrompt = e;
-        console.log("Install Event Caught!"); // Debug log
-
-        if (!isStandalone) {
-            setTimeout(() => {
-                pwaModal.classList.add('show');
-            }, 3000);
-        }
+        if (!isStandalone) setTimeout(() => pwaModal.classList.add('show'), 3000);
     });
 
     async function installPWA() {
-        if (!deferredPrompt) {
-            console.error("No install prompt available");
-            alert("Installation already started or not available. Try refreshing!");
-            return;
-        }
-        
-        // Hide the modal immediately
+        if (!deferredPrompt) return;
         pwaModal.classList.remove('show');
-        
-        // Trigger the chrome prompt
         deferredPrompt.prompt();
-        
-        // Wait for user to click "Install" or "Cancel" in the native dialog
-        const { outcome } = await deferredPrompt.userChoice;
-        console.log(`User response: ${outcome}`);
-        
-        // We can't use the prompt again, so clear it
         deferredPrompt = null;
     }
 
     function dismissInstall() {
         pwaModal.classList.remove('show');
     }
-
-    window.addEventListener('appinstalled', () => {
-        pwaModal.classList.remove('show');
-        deferredPrompt = null;
-        console.log('PWA Installed successfully');
-    });
-    </script>
+</script>
 
 </body>
 </html>
