@@ -601,15 +601,15 @@ class ProSketch {
         reader.readAsDataURL(file);
     }
 
-        saveToGallery() {
+            saveToGallery() {
         try {
-            // 1. Create a thumbnail
+            // 1. Create Thumbnail
             const thumbCanvas = document.createElement('canvas');
             thumbCanvas.width = 300; thumbCanvas.height = 225;
             thumbCanvas.getContext('2d').drawImage(this.canvas, 0,0, 300, 225);
             const thumbData = thumbCanvas.toDataURL('image/jpeg', 0.7);
             
-            // 2. Create the Gallery Item
+            // 2. Add to List
             const artItem = { 
                 id: Date.now(), 
                 date: new Date().toLocaleDateString(), 
@@ -617,19 +617,17 @@ class ProSketch {
                 full: null 
             };
 
-            // 3. Add to Gallery List
             this.gallery.unshift(artItem);
             if(this.gallery.length > 10) this.gallery.pop();
             
-            // 4. Save to Storage
+            // 3. Save to Storage
             localStorage.setItem('prosketch-gallery', JSON.stringify(this.gallery));
             
-            // 5. Success Message ONLY (No Download)
+            // 4. Show Success Message
             this.showToast('Saved to Gallery! 📸');
-            
-            // --- DELETED LINES: ---
-            // this.download(); 
-            // this.showToast('Art downloaded...'); 
+
+            // --- CRITICAL: NO DOWNLOAD CODE HERE ---
+            // If you see "this.download()" here, DELETE IT!
 
         } catch(e) { 
             console.error(e);
