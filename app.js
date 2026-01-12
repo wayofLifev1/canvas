@@ -16,7 +16,7 @@ class ProSketch {
         this.points = [];
         this.isDrawing = false;
         this.isGesture = false;
-        
+        this.colorState = { h: 240, s: 1, v: 1 }; 
         // Tap Gesture Variables
         this.lastTapTime = 0;
         this.touchStartTime = 0;
@@ -95,8 +95,12 @@ class ProSketch {
         }
     }
 
-    bindEvents() {
+        bindEvents() {
         const vp = document.getElementById('viewport');
+        
+        // --- NEW: Palm Rejection / No Scroll ---
+        vp.style.touchAction = 'none'; 
+        
         vp.addEventListener('pointerdown', this.onDown.bind(this), {passive:false});
         window.addEventListener('pointermove', this.onMove.bind(this), {passive:false});
         window.addEventListener('pointerup', this.onUp.bind(this));
@@ -404,25 +408,48 @@ class ProSketch {
         this.redoStack = [];
     }
 
-    undo() { 
+        undo() { 
         if(!this.history.length) { this.showToast('Nothing to Undo'); return; }
+        
         const action = this.history.pop();
         this.redoStack.push(action); 
-        this.rebuildLayers(); 
+        
+        // PASS THE LAYER ID SO WE ONLY REBUILD THAT ONE LAYER
+        this.rebuildLayers(action.layerId); 
+        
         this.showToast('Undo ↩️'); 
     }
 
     redo() { 
         if(!this.redoStack.length) { this.showToast('Nothing to Redo'); return; }
+        
         const action = this.redoStack.pop();
         this.history.push(action); 
-        this.rebuildLayers(); 
+        
+        // PASS THE LAYER ID SO WE ONLY REBUILD THAT ONE LAYER
+        this.rebuildLayers(action.layerId); 
+        
         this.showToast('Redo ↪️');
     }
+    rebuildLayers(specificLayerId = null) {
+        // 1. Determine which layers to clear (Optimization)
+        let layersToUpdate = [];
+        if (specificLayerId) {
+            const l = this.layerManager.layers.find(x => x.id === specificLayerId);
+            if (l) layersToUpdate.push(l);
+        } else {
+            // If no ID provided, rebuild EVERYTHING (fallback)
+            layersToUpdate = this.layerManager.layers;
+        }
 
-    rebuildLayers() {
-        this.layerManager.layers.forEach(l => l.ctx.clearRect(0,0,this.width,this.height));
+        // 2. Clear ONLY the target layers
+        layersToUpdate.forEach(l => l.ctx.clearRect(0, 0, this.width, this.height));
+
+        // 3. Replay History (Skip actions that aren't for our target layer)
         this.history.forEach(act => { 
+            // OPTIMIZATION: If we are only updating Layer X, skip actions for Layer Y
+            if (specificLayerId && act.layerId !== specificLayerId) return;
+
             const l = this.layerManager.layers.find(x => x.id === act.layerId); 
             if(!l) return;
 
@@ -454,8 +481,11 @@ class ProSketch {
                 l.ctx.restore();
             }
         });
+        
+        // 4. Update the screen
         this.requestRender();
     }
+
 
     performFloodFill(layer, x, y, color) {
         this.showToast("Filling... ⏳");
@@ -624,15 +654,18 @@ class ProSketch {
         return; 
     }
     }
-    downloadFromGallery(id) {
-        const item = this.gallery.find(x => x.id === id);
-        if(!item) return;
-        const link = document.createElement('a');
-        link.download = `MyArt-${item.id}.png`;
-        link.href = item.full;
-        link.click();
-        this.showToast('Downloaded! 💾');
-    }
+    // REPLACE THIS FUNCTION IN app.js
+downloadFromGallery(id) {
+    const item = this.gallery.find(x => x.id === id);
+    if(!item) return;
+    
+    const link = document.createElement('a');
+    link.download = `ProSketch-${item.date.replace(/\//g, '-')}-${item.id}.png`;
+    link.href = item.full || item.thumb; 
+    
+    link.click();
+    this.showToast('Art saved to device! 💾');
+}
 
     toggleGalleryModal(forceState) {
         const modal = document.getElementById('gallery-modal');
@@ -794,22 +827,26 @@ class ProSketch {
         this.showToast(`Saving ${ext.toUpperCase()}... 💾`);
     }
 
-    drawReversePicker(canvasId, hue = 0) {
-        const cvs = document.getElementById(canvasId);
-        if (!cvs) return;
-        const ctx = cvs.getContext('2d');
-        const w = cvs.width; const h = cvs.height;
-        const imgData = ctx.createImageData(w, h);
-        const data = imageData.data;
-        for (let x = 0; x < w; x++) {
-            for (let y = 0; y < h; y++) {
-                const s = 1 - (x / w); const v = y / h; const rgb = this.hsvToRgb(hue, s, v);
-                const index = (y * w + x) * 4;
-                data[index] = rgb[0]; data[index+1] = rgb[1]; data[index+2] = rgb[2]; data[index+3] = 255;
-            }
+    // REPLACE THIS FUNCTION IN app.js
+drawReversePicker(canvasId, hue = 0) {
+    const cvs = document.getElementById(canvasId);
+    if (!cvs) return;
+    const ctx = cvs.getContext('2d');
+    const w = cvs.width; const h = cvs.height;
+    
+    // FIX: Define imgData once and use it correctly
+    const imgData = ctx.createImageData(w, h);
+    const data = imgData.data; // Corrected variable reference
+    
+    for (let x = 0; x < w; x++) {
+        for (let y = 0; y < h; y++) {
+            const s = 1 - (x / w); const v = y / h; const rgb = this.hsvToRgb(hue, s, v);
+            const index = (y * w + x) * 4;
+            data[index] = rgb[0]; data[index+1] = rgb[1]; data[index+2] = rgb[2]; data[index+3] = 255;
         }
-        ctx.putImageData(imgData, 0, 0);
     }
+    ctx.putImageData(imgData, 0, 0);
+}
 
     pickCustomColor(e) {
         const rect = e.target.getBoundingClientRect();
@@ -830,7 +867,111 @@ class ProSketch {
         }
         return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
     }
-    
+        // --- ADVANCED COLOR STUDIO LOGIC ---
+
+    toggleColorStudio(show) {
+        const modal = document.getElementById('color-studio-modal');
+        if (show) {
+            modal.classList.add('active');
+            // Slight delay to ensure modal is visible before drawing logic runs
+            setTimeout(() => this.initColorStudio(), 50); 
+        } else {
+            modal.classList.remove('active');
+        }
+    }
+
+    initColorStudio() {
+        this.hueCanvas = document.getElementById('cs-hue-canvas');
+        this.sbCanvas = document.getElementById('cs-sb-canvas');
+        this.sbCtx = this.sbCanvas.getContext('2d');
+        this.hueCtx = this.hueCanvas.getContext('2d');
+
+        // Render Static Hue Strip
+        const grad = this.hueCtx.createLinearGradient(0, 0, this.hueCanvas.width, 0);
+        grad.addColorStop(0, "red"); grad.addColorStop(0.17, "yellow"); grad.addColorStop(0.33, "lime");
+        grad.addColorStop(0.5, "cyan"); grad.addColorStop(0.66, "blue"); grad.addColorStop(0.83, "magenta"); grad.addColorStop(1, "red");
+        this.hueCtx.fillStyle = grad;
+        this.hueCtx.fillRect(0, 0, this.hueCanvas.width, this.hueCanvas.height);
+
+        // Bind Events
+        this.bindColorEvents(this.hueCanvas, 'hue');
+        this.bindColorEvents(this.sbCanvas, 'sb');
+
+        // Initial Render
+        this.updateColorStudioUI();
+    }
+
+    bindColorEvents(canvas, type) {
+        const handle = (e) => {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            let x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+            let y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+            
+            // Clamp values
+            x = Math.max(0, Math.min(x, rect.width));
+            y = Math.max(0, Math.min(y, rect.height));
+
+            if (type === 'hue') {
+                this.colorState.h = (x / rect.width) * 360;
+            } else {
+                this.colorState.s = x / rect.width;
+                this.colorState.v = 1 - (y / rect.height);
+            }
+            this.updateColorStudioUI();
+            this.applyColorFromState();
+        };
+
+        canvas.onmousedown = (e) => { handle(e); document.onmousemove = handle; document.onmouseup = () => { document.onmousemove = null; }; };
+        canvas.ontouchstart = (e) => { handle(e); canvas.ontouchmove = handle; };
+    }
+
+    updateColorStudioUI() {
+        const w = this.sbCanvas.width;
+        const h = this.sbCanvas.height;
+
+        // 1. Redraw Saturation/Brightness Box based on current Hue
+        this.sbCtx.clearRect(0, 0, w, h);
+        
+        // Horizontal Gradient (White -> Hue)
+        const g1 = this.sbCtx.createLinearGradient(0, 0, w, 0);
+        g1.addColorStop(0, "#fff");
+        g1.addColorStop(1, `hsl(${this.colorState.h}, 100%, 50%)`);
+        this.sbCtx.fillStyle = g1; this.sbCtx.fillRect(0,0,w,h);
+
+        // Vertical Gradient (Transparent -> Black)
+        const g2 = this.sbCtx.createLinearGradient(0, 0, 0, h);
+        g2.addColorStop(0, "transparent");
+        g2.addColorStop(1, "#000");
+        this.sbCtx.fillStyle = g2; this.sbCtx.fillRect(0,0,w,h);
+
+        // 2. Update Cursors
+        const hueX = (this.colorState.h / 360) * this.hueCanvas.offsetWidth;
+        document.getElementById('cs-hue-cursor').style.left = hueX + 'px';
+
+        const sbX = this.colorState.s * this.sbCanvas.offsetWidth;
+        const sbY = (1 - this.colorState.v) * this.sbCanvas.offsetHeight;
+        document.getElementById('cs-sb-cursor').style.left = sbX + 'px';
+        document.getElementById('cs-sb-cursor').style.top = sbY + 'px';
+
+        // 3. Update Preview
+        const rgb = this.hsvToRgb(this.colorState.h / 360, this.colorState.s, this.colorState.v);
+        const hex = this.rgbToHex(rgb[0], rgb[1], rgb[2]);
+        document.getElementById('cs-preview').style.background = hex;
+        document.getElementById('cs-hex-input').value = hex;
+    }
+
+    applyColorFromState() {
+        const rgb = this.hsvToRgb(this.colorState.h / 360, this.colorState.s, this.colorState.v);
+        const hex = this.rgbToHex(rgb[0], rgb[1], rgb[2]);
+        this.settings.color = hex;
+        document.getElementById('curr-color').style.background = hex;
+    }
+
+    rgbToHex(r, g, b) {
+        return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+    }
+
             // 1. UPDATED: The Router that decides which engine to use
     drawSymmetry(ctx, points, size, color, cfg, opacity = 1, symmetry = 'none') {
         // Helper to run the correct renderer
@@ -926,11 +1067,8 @@ class ProSketch {
                 ctx.beginPath();
                 
                 if (tool === 'pencil') {
-                    // --- HIGH DENSITY PENCIL TRICK ---
-                    // Draw 2 dots for every 1 step calculation. 
-                    // This doubles density with very little CPU cost.
                     
-                    for(let d=0; d<2; d++) { // <--- Change 2 to 3 for even MORE density
+                    for(let d=0; d<3; d++) { // <--- Change 2 to 3 for even MORE density
                         const angle = Math.random() * 6.28;
                         // Scatter them within the brush width
                         const offset = Math.random() * (w/2); 
@@ -1050,8 +1188,34 @@ class ProSketch {
         };
         this.showToast(messages[t] || "Let's draw!");
     }
-    setColor(c) { this.settings.color = c; document.getElementById('curr-color').style.background = c; }
-    
+        setColor(c) { 
+        this.settings.color = c; 
+        document.getElementById('curr-color').style.background = c;
+        
+        // If it's a hex code, try to parse it to update the Studio UI state
+        if(c.startsWith('#') && c.length === 7) {
+            const r = parseInt(c.slice(1,3), 16) / 255;
+            const g = parseInt(c.slice(3,5), 16) / 255;
+            const b = parseInt(c.slice(5,7), 16) / 255;
+            
+            // Simple RGB to HSV approximation for UI sync
+            const max = Math.max(r, g, b), min = Math.min(r, g, b);
+            let h, s, v = max;
+            const d = max - min;
+            s = max === 0 ? 0 : d / max;
+            if(max === min) h = 0;
+            else {
+                switch(max) {
+                    case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                    case g: h = (b - r) / d + 2; break;
+                    case b: h = (r - g) / d + 4; break;
+                }
+                h /= 6;
+            }
+            this.colorState = { h: h*360, s: s, v: v };
+        }
+    }
+
     togglePicker() {
         this.settings.isPicking = !this.settings.isPicking;
         this.canvas.style.cursor = this.settings.isPicking ? 'url(https://api.iconify.design/mdi:eyedropper.svg?height=24) 0 24, auto' : 'crosshair';
