@@ -601,37 +601,53 @@ class ProSketch {
         reader.readAsDataURL(file);
     }
 
-            saveToGallery() {
+                saveToGallery() {
         try {
-            // 1. Create Thumbnail
+            // --- FIX 1: Create a temporary canvas for the Thumbnail ---
             const thumbCanvas = document.createElement('canvas');
-            thumbCanvas.width = 300; thumbCanvas.height = 225;
-            thumbCanvas.getContext('2d').drawImage(this.canvas, 0,0, 300, 225);
-            const thumbData = thumbCanvas.toDataURL('image/jpeg', 0.7);
+            const w = 300, h = 225;
+            thumbCanvas.width = w; thumbCanvas.height = h;
+            const tCtx = thumbCanvas.getContext('2d');
+
+            // 1. FILL WHITE FIRST (Fixes Black Background)
+            tCtx.fillStyle = '#ffffff';
+            tCtx.fillRect(0, 0, w, h);
+
+            // 2. Draw the art on top
+            tCtx.drawImage(this.canvas, 0, 0, w, h);
+            const thumbData = thumbCanvas.toDataURL('image/jpeg', 0.8);
+
+            // --- FIX 2: Save a "Workable" version (Resized to max 800px to save space) ---
+            const workCanvas = document.createElement('canvas');
+            const scale = Math.min(800 / this.width, 800 / this.height);
+            workCanvas.width = this.width * scale; 
+            workCanvas.height = this.height * scale;
+            const wCtx = workCanvas.getContext('2d');
             
-            // 2. Add to List
+            // Fill white here too
+            wCtx.fillStyle = '#ffffff';
+            wCtx.fillRect(0, 0, workCanvas.width, workCanvas.height);
+            wCtx.drawImage(this.canvas, 0, 0, workCanvas.width, workCanvas.height);
+            const fullData = workCanvas.toDataURL('image/jpeg', 0.8);
+
+            // 3. Create Item
             const artItem = { 
                 id: Date.now(), 
                 date: new Date().toLocaleDateString(), 
                 thumb: thumbData, 
-                full: null 
+                full: fullData // Now we save the bigger version!
             };
 
             this.gallery.unshift(artItem);
-            if(this.gallery.length > 10) this.gallery.pop();
+            // Keep only last 6 items to prevent crashing the storage
+            if(this.gallery.length > 6) this.gallery.pop(); 
             
-            // 3. Save to Storage
             localStorage.setItem('prosketch-gallery', JSON.stringify(this.gallery));
-            
-            // 4. Show Success Message
             this.showToast('Saved to Gallery! 📸');
-
-            // --- CRITICAL: NO DOWNLOAD CODE HERE ---
-            // If you see "this.download()" here, DELETE IT!
 
         } catch(e) { 
             console.error(e);
-            this.showToast('Storage Full! Delete some. 📂'); 
+            this.showToast('Storage Full! Delete old art. 📂'); 
         }
     }
 
@@ -648,28 +664,28 @@ class ProSketch {
     loadFromGallery(id) {
     const item = this.gallery.find(x => x.id === id);
     if (!item) return;
-        if (!item.full && item.thumb) {
-        // Option A: Load blurry thumb
-        // const img = new Image();
-        // img.src = item.thumb; 
-        
-        // Option B (Recommended): Tell user
-        this.showToast("Full art is on your device! 💾");
-        return; 
+        loadFromGallery(id) {
+        const item = this.gallery.find(x => x.id === id);
+        if (!item) return;
+
+        this.showToast("Loading Art... ⏳");
+
+        const img = new Image();
+        img.onload = () => {
+            // 1. Create a New Layer for this art
+            const newLayer = this.layerManager.addLayer('Loaded Art');
+            
+            // 2. Draw the image (Stretched to fit canvas)
+            newLayer.ctx.drawImage(img, 0, 0, this.width, this.height);
+            
+            // 3. Update Screen
+            this.requestRender();
+            this.toggleGalleryModal(false); // Close the gallery
+            this.showToast('Art Loaded to Edit! 🎨');
+        };
+        // Use full version if available, otherwise thumbnail
+        img.src = item.full || item.thumb;
     }
-    }
-    // REPLACE THIS FUNCTION IN app.js
-downloadFromGallery(id) {
-    const item = this.gallery.find(x => x.id === id);
-    if(!item) return;
-    
-    const link = document.createElement('a');
-    link.download = `ProSketch-${item.date.replace(/\//g, '-')}-${item.id}.png`;
-    link.href = item.full || item.thumb; 
-    
-    link.click();
-    this.showToast('Art saved to device! 💾');
-}
 
     toggleGalleryModal(forceState) {
         const modal = document.getElementById('gallery-modal');
