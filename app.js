@@ -602,6 +602,7 @@ class ProSketch {
     }
 
     saveToGallery() {
+        saveToGallery() {
         try {
             // 1. Create a thumbnail
             const thumbCanvas = document.createElement('canvas');
@@ -609,35 +610,34 @@ class ProSketch {
             thumbCanvas.getContext('2d').drawImage(this.canvas, 0,0, 300, 225);
             const thumbData = thumbCanvas.toDataURL('image/jpeg', 0.7);
             
-            // 2. Create the Gallery Item object
+            // 2. Create the Gallery Item
             const artItem = { 
                 id: Date.now(), 
                 date: new Date().toLocaleDateString(), 
                 thumb: thumbData, 
-                full: null // We keep 'full' null to save LocalStorage space
+                full: null 
             };
 
-            // 3. Add to the front of the list
+            // 3. Add to Gallery List
             this.gallery.unshift(artItem);
-            
-            // Limit to 10 items to prevent storage full errors
             if(this.gallery.length > 10) this.gallery.pop();
             
-            // 4. Save to LocalStorage
+            // 4. Save to Storage
             localStorage.setItem('prosketch-gallery', JSON.stringify(this.gallery));
             
-            // 5. Success Message (ONLY Gallery)
+            // 5. Success Message ONLY (No Download)
             this.showToast('Saved to Gallery! 📸');
             
-            // REMOVED: this.download(); 
-            // REMOVED: this.showToast('Art downloaded...');
+            // --- DELETED LINES: ---
+            // this.download(); 
+            // this.showToast('Art downloaded...'); 
 
         } catch(e) { 
             console.error(e);
             this.showToast('Storage Full! Delete some. 📂'); 
         }
     }
-    
+
     loadGallery() {
         try { const g = localStorage.getItem('prosketch-gallery'); if(g) this.gallery = JSON.parse(g); } catch(e) {}
     }
