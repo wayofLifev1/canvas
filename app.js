@@ -1149,18 +1149,41 @@ drawReversePicker(canvasId, hue = 0) {
     }
 
     // 4. EXISTING: Vector Engine (Pen/Brush)
+        // Replace the existing drawStroke function
     drawStroke(ctx, points, size, color, cfg, opacity = 1) {
         if (points.length < 2) return;
-        const options = { size: size, thinning: cfg.thinning, smoothing: cfg.smoothing, streamline: cfg.streamline, start: cfg.start, end: cfg.end, simulatePressure: points[0].length < 3 || points[0][2] === 0.5 };
+        
+        const options = { 
+            size: size, 
+            thinning: cfg.thinning, 
+            smoothing: cfg.smoothing, 
+            streamline: cfg.streamline, 
+            start: cfg.start, 
+            end: cfg.end, 
+            simulatePressure: points[0].length < 3 || points[0][2] === 0.5 
+        };
+        
         const outline = getStroke(points, options);
         const path = new Path2D(this.getSvgPath(outline));
+        
         ctx.save();
         ctx.globalCompositeOperation = cfg.composite;
         ctx.globalAlpha = opacity * (cfg.opacity || 1);
-        ctx.fillStyle = color;
+        
+        // --- NEW: FAST NEON LOGIC ---
+        // We apply the shadow ONCE to the entire path, not every pixel.
+        if (cfg.glow) {
+            ctx.shadowBlur = size * 1.5;   // The glow spread
+            ctx.shadowColor = color;       // The glow color
+            ctx.fillStyle = '#ffffff';     // The core is white
+        } else {
+            ctx.fillStyle = color;
+        }
+        
         ctx.fill(path);
         ctx.restore();
     }
+
 
 
     getSvgPath(stroke) {
