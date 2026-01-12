@@ -602,35 +602,42 @@ class ProSketch {
     }
 
     saveToGallery() {
-    try {
-        const thumbCanvas = document.createElement('canvas');
-        thumbCanvas.width = 300; thumbCanvas.height = 225;
-        thumbCanvas.getContext('2d').drawImage(this.canvas, 0,0, 300, 225);
-        const thumbData = thumbCanvas.toDataURL('image/jpeg', 0.7);
-        const artItem = { 
-            id: Date.now(), 
-            date: new Date().toLocaleDateString(), 
-            thumb: thumbData, 
-            full: null // Don't save full string here
-        };
+        try {
+            // 1. Create a thumbnail
+            const thumbCanvas = document.createElement('canvas');
+            thumbCanvas.width = 300; thumbCanvas.height = 225;
+            thumbCanvas.getContext('2d').drawImage(this.canvas, 0,0, 300, 225);
+            const thumbData = thumbCanvas.toDataURL('image/jpeg', 0.7);
+            
+            // 2. Create the Gallery Item object
+            const artItem = { 
+                id: Date.now(), 
+                date: new Date().toLocaleDateString(), 
+                thumb: thumbData, 
+                full: null // We keep 'full' null to save LocalStorage space
+            };
 
-        this.gallery.unshift(artItem);
-        if(this.gallery.length > 10) this.gallery.pop();
-        
-        localStorage.setItem('prosketch-gallery', JSON.stringify(this.gallery));
-        this.showToast('Saved to Gallery! 📸');
-        
-        // Auto-download the full version because we can't store it
-        this.download(); 
-        this.showToast('Art downloaded to device 💾');
+            // 3. Add to the front of the list
+            this.gallery.unshift(artItem);
+            
+            // Limit to 10 items to prevent storage full errors
+            if(this.gallery.length > 10) this.gallery.pop();
+            
+            // 4. Save to LocalStorage
+            localStorage.setItem('prosketch-gallery', JSON.stringify(this.gallery));
+            
+            // 5. Success Message (ONLY Gallery)
+            this.showToast('Saved to Gallery! 📸');
+            
+            // REMOVED: this.download(); 
+            // REMOVED: this.showToast('Art downloaded...');
 
-    } catch(e) { 
-        console.error(e);
-        this.showToast('Storage Full! Delete some. 📂'); 
+        } catch(e) { 
+            console.error(e);
+            this.showToast('Storage Full! Delete some. 📂'); 
+        }
     }
-}
-
-
+    
     loadGallery() {
         try { const g = localStorage.getItem('prosketch-gallery'); if(g) this.gallery = JSON.parse(g); } catch(e) {}
     }
