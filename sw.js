@@ -1,4 +1,4 @@
-const CACHE_NAME = 'prosketch-v1';
+const CACHE_NAME = 'prosketch-v2';
 const ASSETS = [
   './',
   './index.html',
