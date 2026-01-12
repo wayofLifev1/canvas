@@ -5,7 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ProSketch Studio 🎨</title>
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#6366f1">
+    <meta name="theme-color" content="#6366f1">    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ProSketch">
     <link rel="apple-touch-icon" href="./icon-192.png">
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
@@ -601,8 +604,8 @@ body {
 </div>
 
     <script type="module" src="app.js"></script>
-        <script>
-    // Register Service Worker
+            <script>
+    // 1. Register Service Worker (Required for Windows/Android Install)
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('./sw.js')
@@ -611,23 +614,44 @@ body {
         });
     }
 
-    // PWA Install Logic
+    // 2. Logic to Handle Install Prompt
     let deferredPrompt;
     const pwaModal = document.getElementById('pwa-install-prompt');
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
 
-    // 1. IMMEDIATE CHECK: If already installed (Standalone), destroy the modal.
-    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
+    // A. If already installed, HIDE everything permanently
+    if (isStandalone) {
         pwaModal.style.display = 'none';
+    } 
+    // B. Handle iOS Users (Who don't get the automatic event)
+    else if (isIOS) {
+        // Change the text for iOS users
+        document.querySelector('#pwa-install-prompt h3').textContent = "Install on iOS";
+        document.querySelector('#pwa-install-prompt p').textContent = "Tap the Share Button ⬆️ and select 'Add to Home Screen' ➕";
+        
+        // Hide the "Install" button since JS can't trigger it on iOS
+        document.querySelector('.btn-pwa.primary').style.display = 'none';
+        
+        // Show the modal after a delay
+        setTimeout(() => {
+            pwaModal.classList.add('show');
+            pwaModal.style.visibility = 'visible';
+            pwaModal.style.opacity = '1';
+        }, 3000);
     }
 
+    // C. Handle Windows/Android Users (Standard Event)
     window.addEventListener('beforeinstallprompt', (e) => {
-        // Prevent Chrome 67 and earlier from automatically showing the prompt
         e.preventDefault();
         deferredPrompt = e;
         
-        // Only show if NOT already in standalone mode
-        if (!window.matchMedia('(display-mode: standalone)').matches) {
-            setTimeout(() => pwaModal.classList.add('show'), 3000);
+        if (!isStandalone) {
+            setTimeout(() => {
+                pwaModal.classList.add('show');
+                pwaModal.style.visibility = 'visible';
+                pwaModal.style.opacity = '1';
+            }, 3000);
         }
     });
 
@@ -642,12 +666,12 @@ body {
 
     function dismissInstall() {
         pwaModal.classList.remove('show');
+        // Optional: Save to localStorage to remember they dismissed it
     }
 
     window.addEventListener('appinstalled', () => {
         pwaModal.classList.remove('show');
         deferredPrompt = null;
-        console.log('PWA was installed');
     });
     </script>
 </body>
