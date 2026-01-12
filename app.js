@@ -601,53 +601,45 @@ class ProSketch {
         reader.readAsDataURL(file);
     }
 
-                saveToGallery() {
+                    saveToGallery() {
         try {
-            // --- FIX 1: Create a temporary canvas for the Thumbnail ---
+            // 1. Create Thumbnail (With White Background)
             const thumbCanvas = document.createElement('canvas');
             const w = 300, h = 225;
             thumbCanvas.width = w; thumbCanvas.height = h;
             const tCtx = thumbCanvas.getContext('2d');
-
-            // 1. FILL WHITE FIRST (Fixes Black Background)
-            tCtx.fillStyle = '#ffffff';
+            tCtx.fillStyle = '#ffffff'; // FIX: Fill White to prevent black background
             tCtx.fillRect(0, 0, w, h);
-
-            // 2. Draw the art on top
             tCtx.drawImage(this.canvas, 0, 0, w, h);
             const thumbData = thumbCanvas.toDataURL('image/jpeg', 0.8);
-
-            // --- FIX 2: Save a "Workable" version (Resized to max 800px to save space) ---
+            
+            // 2. Create Full Version (Resized for storage safety)
             const workCanvas = document.createElement('canvas');
             const scale = Math.min(800 / this.width, 800 / this.height);
-            workCanvas.width = this.width * scale; 
-            workCanvas.height = this.height * scale;
+            workCanvas.width = this.width * scale; workCanvas.height = this.height * scale;
             const wCtx = workCanvas.getContext('2d');
-            
-            // Fill white here too
-            wCtx.fillStyle = '#ffffff';
+            wCtx.fillStyle = '#ffffff'; // FIX: Fill White
             wCtx.fillRect(0, 0, workCanvas.width, workCanvas.height);
             wCtx.drawImage(this.canvas, 0, 0, workCanvas.width, workCanvas.height);
             const fullData = workCanvas.toDataURL('image/jpeg', 0.8);
 
-            // 3. Create Item
+            // 3. Save Item
             const artItem = { 
                 id: Date.now(), 
                 date: new Date().toLocaleDateString(), 
                 thumb: thumbData, 
-                full: fullData // Now we save the bigger version!
+                full: fullData // FIX: Now saving the full image
             };
 
             this.gallery.unshift(artItem);
-            // Keep only last 6 items to prevent crashing the storage
-            if(this.gallery.length > 6) this.gallery.pop(); 
+            if(this.gallery.length > 6) this.gallery.pop();
             
             localStorage.setItem('prosketch-gallery', JSON.stringify(this.gallery));
             this.showToast('Saved to Gallery! 📸');
 
         } catch(e) { 
             console.error(e);
-            this.showToast('Storage Full! Delete old art. 📂'); 
+            this.showToast('Storage Full! Delete some. 📂'); 
         }
     }
 
@@ -661,29 +653,21 @@ class ProSketch {
         this.refreshGalleryModal(); 
     }
 
-    loadFromGallery(id) {
-    const item = this.gallery.find(x => x.id === id);
-    if (!item) return;
         loadFromGallery(id) {
         const item = this.gallery.find(x => x.id === id);
         if (!item) return;
 
+        // FIX: Actually load the image!
         this.showToast("Loading Art... ⏳");
-
         const img = new Image();
         img.onload = () => {
-            // 1. Create a New Layer for this art
             const newLayer = this.layerManager.addLayer('Loaded Art');
-            
-            // 2. Draw the image (Stretched to fit canvas)
             newLayer.ctx.drawImage(img, 0, 0, this.width, this.height);
-            
-            // 3. Update Screen
             this.requestRender();
-            this.toggleGalleryModal(false); // Close the gallery
-            this.showToast('Art Loaded to Edit! 🎨');
+            this.toggleGalleryModal(false);
+            this.showToast('Art Loaded! 🎨');
         };
-        // Use full version if available, otherwise thumbnail
+        // Load full version if available, otherwise thumb
         img.src = item.full || item.thumb;
     }
 
@@ -998,7 +982,7 @@ drawReversePicker(canvasId, hue = 0) {
         const render = (pts) => {
             const tool = this.settings.tool;
             
-            if (['pencil', 'marker', 'neon'].includes(tool)) {
+            if (['pencil', 'marker'].includes(tool)) {
                 this.drawTexturedStroke(ctx, pts, size, color, tool, opacity);
             } 
             // B. The "Particle" Engine (New additions)
@@ -1149,33 +1133,20 @@ drawReversePicker(canvasId, hue = 0) {
     }
 
     // 4. EXISTING: Vector Engine (Pen/Brush)
-        // Replace the existing drawStroke function
-    drawStroke(ctx, points, size, color, cfg, opacity = 1) {
+            drawStroke(ctx, points, size, color, cfg, opacity = 1) {
         if (points.length < 2) return;
-        
-        const options = { 
-            size: size, 
-            thinning: cfg.thinning, 
-            smoothing: cfg.smoothing, 
-            streamline: cfg.streamline, 
-            start: cfg.start, 
-            end: cfg.end, 
-            simulatePressure: points[0].length < 3 || points[0][2] === 0.5 
-        };
-        
+        const options = { size: size, thinning: cfg.thinning, smoothing: cfg.smoothing, streamline: cfg.streamline, start: cfg.start, end: cfg.end, simulatePressure: points[0].length < 3 || points[0][2] === 0.5 };
         const outline = getStroke(points, options);
         const path = new Path2D(this.getSvgPath(outline));
-        
         ctx.save();
         ctx.globalCompositeOperation = cfg.composite;
         ctx.globalAlpha = opacity * (cfg.opacity || 1);
         
-        // --- NEW: FAST NEON LOGIC ---
-        // We apply the shadow ONCE to the entire path, not every pixel.
+        // --- FIX: ADDED GLOW LOGIC FOR NEON ---
         if (cfg.glow) {
-            ctx.shadowBlur = size * 1.5;   // The glow spread
-            ctx.shadowColor = color;       // The glow color
-            ctx.fillStyle = '#ffffff';     // The core is white
+            ctx.shadowBlur = size * 1.5;
+            ctx.shadowColor = color;
+            ctx.fillStyle = '#ffffff'; 
         } else {
             ctx.fillStyle = color;
         }
@@ -1183,9 +1154,6 @@ drawReversePicker(canvasId, hue = 0) {
         ctx.fill(path);
         ctx.restore();
     }
-
-
-
     getSvgPath(stroke) {
         if (!stroke.length) return "";
         const d = stroke.reduce((acc, [x0, y0], i, arr) => { const [x1, y1] = arr[(i + 1) % arr.length]; acc.push(x0, y0, (x0 + x1) / 2, (y0 + y1) / 2); return acc; }, ["M", ...stroke[0], "Q"]);
