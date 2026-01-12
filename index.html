@@ -324,12 +324,11 @@
             text-align: left;
         }
         .template-btn:hover { background: #e2e8f0; }
-        /* --- PWA INSTALL POPUP --- */
+                /* --- FIXED PWA POPUP CSS --- */
         #pwa-install-prompt {
             position: fixed;
             bottom: 20px;
             left: 50%;
-            transform: translateX(-50%) translateY(150px); /* Hidden by default */
             width: 90%;
             max-width: 400px;
             background: rgba(255, 255, 255, 0.95);
@@ -339,17 +338,26 @@
             box-shadow: 0 10px 40px rgba(0,0,0,0.2);
             border: 2px solid white;
             z-index: 1000;
-            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             display: flex;
             flex-direction: column;
             gap: 15px;
             text-align: center;
+            
+            /* KEY FIXES BELOW: */
+            /* 1. Push it WAY down (100vh) so it's definitely off-screen */
+            transform: translateX(-50%) translateY(200%); 
+            /* 2. Hide it from screen readers/touches until active */
+            visibility: hidden; 
+            opacity: 0;
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.4s, visibility 0.4s;
         }
 
         #pwa-install-prompt.show {
+            /* Bring it back to position */
             transform: translateX(-50%) translateY(0);
+            visibility: visible;
+            opacity: 1;
         }
-
         .pwa-header {
             display: flex;
             align-items: center;
@@ -414,7 +422,15 @@
 
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-    </style>
+  /* Prevent long-press text selection menus on mobile */
+body {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
+  </style>
 </head>
 <body>
 
@@ -457,29 +473,6 @@
                 <div class="case-tool" id="t-eraser" onclick="app.setTool('eraser')">🧼</div>
             </div> 
         </div>
-
-        <div class="bottom-bar pointer-auto">
-            <div class="btn-icon" onclick="app.toggleProps('settings')" style="background:#fff;">⚙️</div>
-
-            <div class="control-group">
-                <div id="curr-color" class="color-swatch" onclick="app.togglePicker()"></div>
-                <div class="color-swatch" style="background:#ef4444" onclick="app.setColor('#ef4444')"></div>
-                <div class="color-swatch" style="background:#f97316" onclick="app.setColor('#f97316')"></div>
-                <div class="color-swatch" style="background:#eab308" onclick="app.setColor('#eab308')"></div>
-                <div class="color-swatch" style="background:#22c55e" onclick="app.setColor('#22c55e')"></div>
-                <div class="color-swatch" style="background:#3b82f6" onclick="app.setColor('#3b82f6')"></div>
-                <div class="color-swatch" style="background:#a855f7" onclick="app.setColor('#a855f7')"></div>
-                <div class="color-swatch" style="background:#000000" onclick="app.setColor('#000000')"></div>
-
-                <div style="width:1px; height:24px; background:#e2e8f0; margin:0 5px;"></div>
-
-                <span style="font-size:12px;">Size</span>
-                <input type="range" id="size-slider" min="1" max="100" value="10" oninput="app.updateSettings('size', this.value)">
-            </div>
-
-            <div class="btn-icon" onclick="app.toggleProps('layers')" style="background:#fff;">📄</div>
-        </div>
-    </div>
 
     <div id="main-panel" class="pointer-auto">
         <div class="panel-header">
@@ -545,9 +538,70 @@
             <button class="btn-pwa primary" onclick="installPWA()">Install</button>
         </div>
     </div>
+<div class="bottom-bar pointer-auto" style="padding: 10px 5px; width: 100%; justify-content: space-between;">
+    
+    <div class="btn-icon" onclick="app.toggleProps('settings')" style="background:#fff; width:38px; height:38px; font-size:18px; flex-shrink:0;">⚙️</div>
+
+    <div class="control-group" style="padding: 5px 8px; flex: 1; margin: 0 5px; justify-content: space-around; gap: 2px; min-width: 0;">
+        
+        <div style="display:flex; align-items:center; gap:5px;">
+            <div id="curr-color" class="color-swatch" onclick="app.toggleColorStudio(true)" style="border: 2px solid #333; width:30px; height:30px; flex-shrink:0;"></div>
+            <div class="btn-icon" onclick="app.toggleColorStudio(true)" style="width:30px; height:30px; border-radius:50%; background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red); border:2px solid white; flex-shrink:0;"></div>
+            
+            <div style="display:flex; gap:4px; overflow:hidden;">
+                <div class="color-swatch" style="background:#000000; width:24px; height:24px; flex-shrink:0;" onclick="app.setColor('#000000')"></div>
+                <div class="color-swatch" style="background:#ef4444; width:24px; height:24px; flex-shrink:0;" onclick="app.setColor('#ef4444')"></div>
+                </div>
+        </div>
+
+        <div style="width:1px; height:30px; background:#e2e8f0; margin:0 4px;"></div>
+
+        <div style="display:flex; flex-direction:column; justify-content:center; gap:4px; min-width: 80px;">
+            <div style="display:flex; align-items:center; justify-content: space-between;">
+                <span style="font-size:9px; font-weight:bold; color:#64748b; text-transform:uppercase;">Size</span>
+                <input type="range" id="size-slider" min="1" max="100" value="10" oninput="app.updateSettings('size', this.value)" style="width:60px; height:3px;">
+            </div>
+            <div style="display:flex; align-items:center; justify-content: space-between;">
+                <span style="font-size:9px; font-weight:bold; color:#64748b; text-transform:uppercase;">Fade</span>
+                <input type="range" id="opacity-slider" min="1" max="100" value="100" oninput="app.updateSettings('opacity', this.value)" style="width:60px; height:3px;">
+            </div>
+        </div>
+
+    </div>
+
+    <div class="btn-icon" onclick="app.toggleProps('layers')" style="background:#fff; width:38px; height:38px; font-size:18px; flex-shrink:0;">📄</div>
+</div>
+
+<div id="color-studio-modal" class="modal">
+    <div class="modal-box pointer-auto" style="width: 350px; max-width: 90%;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h3 style="margin:0;">Color Studio 🎨</h3>
+            <div class="btn-icon" onclick="app.toggleColorStudio(false)">✕</div>
+        </div>
+
+        <div style="position:relative; width:100%; height:200px; border-radius:12px; overflow:hidden; margin-bottom:15px; cursor:crosshair; box-shadow:inset 0 0 0 2px rgba(0,0,0,0.1);">
+            <canvas id="cs-sb-canvas" width="300" height="200" style="width:100%; height:100%; display:block;"></canvas>
+            <div id="cs-sb-cursor" style="position:absolute; width:16px; height:16px; border:2px solid white; border-radius:50%; box-shadow:0 0 2px rgba(0,0,0,0.5); pointer-events:none; transform:translate(-50%, -50%); top:0; left:100%;"></div>
+        </div>
+
+        <div style="position:relative; width:100%; height:30px; border-radius:15px; overflow:hidden; margin-bottom:20px; cursor:ew-resize; box-shadow:inset 0 0 0 2px rgba(0,0,0,0.1);">
+            <canvas id="cs-hue-canvas" width="300" height="30" style="width:100%; height:100%; display:block;"></canvas>
+            <div id="cs-hue-cursor" style="position:absolute; width:10px; height:100%; background:white; border:1px solid #ccc; pointer-events:none; top:0; left:0; transform:translateX(-50%); box-shadow:0 0 2px rgba(0,0,0,0.3);"></div>
+        </div>
+
+        <div style="display:flex; gap:10px; align-items:center;">
+            <div id="cs-preview" style="width:50px; height:50px; border-radius:12px; border:2px solid #e2e8f0; box-shadow:0 2px 5px rgba(0,0,0,0.05);"></div>
+            <div style="flex:1;">
+                <div style="font-size:12px; color:#64748b; margin-bottom:4px;">HEX CODE</div>
+                <input type="text" id="cs-hex-input" value="#6366f1" style="width:100%; padding:10px; border:2px solid #e2e8f0; border-radius:8px; font-family:'Fredoka'; font-weight:600; color:#475569; text-transform:uppercase;">
+            </div>
+            <button onclick="app.toggleColorStudio(false)" style="padding:0 20px; height:50px; background:var(--primary); color:white; border:none; border-radius:12px; font-weight:bold; cursor:pointer;">Done</button>
+        </div>
+    </div>
+</div>
 
     <script type="module" src="app.js"></script>
-    <script>
+        <script>
     // Register Service Worker
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
@@ -561,23 +615,28 @@
     let deferredPrompt;
     const pwaModal = document.getElementById('pwa-install-prompt');
 
+    // 1. IMMEDIATE CHECK: If already installed (Standalone), destroy the modal.
+    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
+        pwaModal.style.display = 'none';
+    }
+
     window.addEventListener('beforeinstallprompt', (e) => {
         // Prevent Chrome 67 and earlier from automatically showing the prompt
         e.preventDefault();
-        // Stash the event so it can be triggered later.
         deferredPrompt = e;
-        // Show the prompt
-        setTimeout(() => pwaModal.classList.add('show'), 3000); // Delay slightly for effect
+        
+        // Only show if NOT already in standalone mode
+        if (!window.matchMedia('(display-mode: standalone)').matches) {
+            setTimeout(() => pwaModal.classList.add('show'), 3000);
+        }
     });
 
     async function installPWA() {
         if (!deferredPrompt) return;
-        
         pwaModal.classList.remove('show');
         deferredPrompt.prompt();
-        
         const { outcome } = await deferredPrompt.userChoice;
-        console.log(`User response to the install prompt: ${outcome}`);
+        console.log(`User response: ${outcome}`);
         deferredPrompt = null;
     }
 
@@ -591,6 +650,5 @@
         console.log('PWA was installed');
     });
     </script>
-
 </body>
 </html>
