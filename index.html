@@ -327,7 +327,7 @@
             text-align: left;
         }
         .template-btn:hover { background: #e2e8f0; }
-                /* --- FIXED PWA POPUP CSS --- */
+                        /* --- FIXED PWA POPUP CSS --- */
         #pwa-install-prompt {
             position: fixed;
             bottom: 20px;
@@ -340,23 +340,20 @@
             padding: 20px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.2);
             border: 2px solid white;
-            z-index: 1000;
+            z-index: 9999; /* Ensure it is on top of EVERYTHING */
             display: flex;
             flex-direction: column;
             gap: 15px;
             text-align: center;
+            pointer-events: auto; /* CRITICAL: Force touches to work */
             
-            /* KEY FIXES BELOW: */
-            /* 1. Push it WAY down (100vh) so it's definitely off-screen */
             transform: translateX(-50%) translateY(200%); 
-            /* 2. Hide it from screen readers/touches until active */
             visibility: hidden; 
             opacity: 0;
-            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.4s, visibility 0.4s;
+            transition: transform 0.4s, opacity 0.4s, visibility 0.4s;
         }
 
         #pwa-install-prompt.show {
-            /* Bring it back to position */
             transform: translateX(-50%) translateY(0);
             visibility: visible;
             opacity: 1;
@@ -604,8 +601,8 @@ body {
 </div>
 
     <script type="module" src="app.js"></script>
-            <script>
-    // 1. Register Service Worker (Required for Windows/Android Install)
+                <script>
+    // 1. Register Service Worker
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('./sw.js')
@@ -614,65 +611,73 @@ body {
         });
     }
 
-    // 2. Logic to Handle Install Prompt
+    // 2. Install Logic
     let deferredPrompt;
     const pwaModal = document.getElementById('pwa-install-prompt');
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
 
-    // A. If already installed, HIDE everything permanently
+    // A. If already installed, hide everything
     if (isStandalone) {
         pwaModal.style.display = 'none';
     } 
-    // B. Handle iOS Users (Who don't get the automatic event)
+    // B. iOS Handling (Manual Instructions)
     else if (isIOS) {
-        // Change the text for iOS users
         document.querySelector('#pwa-install-prompt h3').textContent = "Install on iOS";
-        document.querySelector('#pwa-install-prompt p').textContent = "Tap the Share Button ⬆️ and select 'Add to Home Screen' ➕";
+        document.querySelector('#pwa-install-prompt p').textContent = "Tap Share ⬆️ -> Add to Home Screen ➕";
+        document.querySelector('.btn-pwa.primary').style.display = 'none'; // Hide button on iOS
         
-        // Hide the "Install" button since JS can't trigger it on iOS
-        document.querySelector('.btn-pwa.primary').style.display = 'none';
-        
-        // Show the modal after a delay
         setTimeout(() => {
             pwaModal.classList.add('show');
-            pwaModal.style.visibility = 'visible';
-            pwaModal.style.opacity = '1';
         }, 3000);
     }
 
-    // C. Handle Windows/Android Users (Standard Event)
+    // C. Android/Windows Handling (The "Install" Button)
     window.addEventListener('beforeinstallprompt', (e) => {
+        // Prevent Chrome from hiding the event
         e.preventDefault();
+        // Save the event for later (CRITICAL)
         deferredPrompt = e;
-        
+        console.log("Install Event Caught!"); // Debug log
+
         if (!isStandalone) {
             setTimeout(() => {
                 pwaModal.classList.add('show');
-                pwaModal.style.visibility = 'visible';
-                pwaModal.style.opacity = '1';
             }, 3000);
         }
     });
 
     async function installPWA() {
-        if (!deferredPrompt) return;
+        if (!deferredPrompt) {
+            console.error("No install prompt available");
+            alert("Installation already started or not available. Try refreshing!");
+            return;
+        }
+        
+        // Hide the modal immediately
         pwaModal.classList.remove('show');
+        
+        // Trigger the chrome prompt
         deferredPrompt.prompt();
+        
+        // Wait for user to click "Install" or "Cancel" in the native dialog
         const { outcome } = await deferredPrompt.userChoice;
         console.log(`User response: ${outcome}`);
+        
+        // We can't use the prompt again, so clear it
         deferredPrompt = null;
     }
 
     function dismissInstall() {
         pwaModal.classList.remove('show');
-        // Optional: Save to localStorage to remember they dismissed it
     }
 
     window.addEventListener('appinstalled', () => {
         pwaModal.classList.remove('show');
         deferredPrompt = null;
+        console.log('PWA Installed successfully');
     });
     </script>
+
 </body>
 </html>
