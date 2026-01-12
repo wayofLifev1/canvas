@@ -601,7 +601,6 @@ class ProSketch {
         reader.readAsDataURL(file);
     }
 
-    saveToGallery() {
         saveToGallery() {
         try {
             // 1. Create a thumbnail
