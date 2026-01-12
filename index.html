@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ProSketch Studio 🎨</title>
     <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#6366f1">
-<link rel="apple-touch-icon" href="./icon-192.png">
+    <meta name="theme-color" content="#6366f1">
+    <link rel="apple-touch-icon" href="./icon-192.png">
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -96,6 +96,25 @@
         }
         .btn-icon:active { transform: scale(0.9); }
         .btn-icon:hover { background: #f1f5f9; }
+
+        /* --- NEW: Floating Save Button --- */
+        .floating-save {
+            position: absolute;
+            top: 80px; 
+            right: 20px;
+            width: 45px; height: 45px;
+            background: #fff;
+            border-radius: 50%;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+            font-size: 22px;
+            border: 3px solid white;
+            transition: transform 0.2s;
+            z-index: 110;
+        }
+        .floating-save:active { transform: scale(0.9); }
+        .floating-save:hover { background: #f0f9ff; }
 
         /* Draggable Pencil Case */
         #pencil-case-container {
@@ -305,78 +324,78 @@
             text-align: left;
         }
         .template-btn:hover { background: #e2e8f0; }
-    /* --- PWA INSTALL POPUP --- */
-#pwa-install-prompt {
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%) translateY(150px); /* Hidden by default */
-    width: 90%;
-    max-width: 400px;
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(15px);
-    border-radius: 20px;
-    padding: 20px;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-    border: 2px solid white;
-    z-index: 1000;
-    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-    text-align: center;
-}
+        /* --- PWA INSTALL POPUP --- */
+        #pwa-install-prompt {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(150px); /* Hidden by default */
+            width: 90%;
+            max-width: 400px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(15px);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            border: 2px solid white;
+            z-index: 1000;
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            text-align: center;
+        }
 
-#pwa-install-prompt.show {
-    transform: translateX(-50%) translateY(0);
-}
+        #pwa-install-prompt.show {
+            transform: translateX(-50%) translateY(0);
+        }
 
-.pwa-header {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    text-align: left;
-}
+        .pwa-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            text-align: left;
+        }
 
-.pwa-icon-placeholder {
-    width: 50px;
-    height: 50px;
-    background: var(--primary);
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-    color: white;
-}
+        .pwa-icon-placeholder {
+            width: 50px;
+            height: 50px;
+            background: var(--primary);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: white;
+        }
 
-.pwa-actions {
-    display: flex;
-    gap: 10px;
-    margin-top: 5px;
-}
+        .pwa-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 5px;
+        }
 
-.btn-pwa {
-    flex: 1;
-    padding: 12px;
-    border-radius: 12px;
-    border: none;
-    font-family: inherit;
-    font-weight: 600;
-    cursor: pointer;
-    font-size: 14px;
-}
+        .btn-pwa {
+            flex: 1;
+            padding: 12px;
+            border-radius: 12px;
+            border: none;
+            font-family: inherit;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 14px;
+        }
 
-.btn-pwa.primary {
-    background: var(--primary);
-    color: white;
-    box-shadow: 0 4px 10px rgba(99, 102, 241, 0.3);
-}
+        .btn-pwa.primary {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 10px rgba(99, 102, 241, 0.3);
+        }
 
-.btn-pwa.secondary {
-    background: #f1f5f9;
-    color: #64748b;
-}
+        .btn-pwa.secondary {
+            background: #f1f5f9;
+            color: #64748b;
+        }
         /* Toast */
         #toast {
             position: fixed;
@@ -411,7 +430,7 @@
         
         <div class="top-bar pointer-auto">
             <div style="display:flex; gap:10px;">
-                <div class="btn-icon" onclick="app.loadState()" title="Load Save">📂</div>
+                <div class="btn-icon" onclick="app.toggleGalleryModal(true)" title="My Gallery">🖼️</div>
                 <div class="btn-icon" onclick="app.toggleTemplateModal()" title="Templates">🧩</div>
             </div>
             
@@ -423,16 +442,20 @@
             </div>
         </div>
 
+        <div class="floating-save pointer-auto" onclick="app.saveToGallery()" title="Quick Save">
+            💾
+        </div>
+
         <div id="pencil-case-container" class="pointer-auto">
             <div id="case-toggle">✏️</div>
-            <<div id="case-items">
-    <div class="case-tool active" id="t-pen" onclick="app.setTool('pen')">🖊️</div>
-    <div class="case-tool" id="t-pencil" onclick="app.setTool('pencil')">✏️</div>
-    <div class="case-tool" id="t-brush" onclick="app.setTool('brush')">🖌️</div>
-    <div class="case-tool" id="t-marker" onclick="app.setTool('marker')">🖍️</div>
-    <div class="case-tool" id="t-neon" onclick="app.setTool('neon')">✨</div>
-    <div class="case-tool" id="t-eraser" onclick="app.setTool('eraser')">🧼</div>
-</div> 
+            <div id="case-items">
+                <div class="case-tool active" id="t-pen" onclick="app.setTool('pen')">🖊️</div>
+                <div class="case-tool" id="t-pencil" onclick="app.setTool('pencil')">✏️</div>
+                <div class="case-tool" id="t-brush" onclick="app.setTool('brush')">🖌️</div>
+                <div class="case-tool" id="t-marker" onclick="app.setTool('marker')">🖍️</div>
+                <div class="case-tool" id="t-neon" onclick="app.setTool('neon')">✨</div>
+                <div class="case-tool" id="t-eraser" onclick="app.setTool('eraser')">🧼</div>
+            </div> 
         </div>
 
         <div class="bottom-bar pointer-auto">
@@ -509,21 +532,22 @@
     </div>
 
     <div id="toast"></div>
-        <div id="pwa-install-prompt">
-    <div class="pwa-header">
-        <div class="pwa-icon-placeholder">🎨</div> <div>
-            <h3 style="margin:0; color:#1e293b;">Install App</h3>
-            <p style="margin:4px 0 0; color:#64748b; font-size:13px;">Get the full screen experience!</p>
+    <div id="pwa-install-prompt">
+        <div class="pwa-header">
+            <div class="pwa-icon-placeholder">🎨</div> 
+            <div>
+                <h3 style="margin:0; color:#1e293b;">Install App</h3>
+                <p style="margin:4px 0 0; color:#64748b; font-size:13px;">Get the full screen experience!</p>
+            </div>
+        </div>
+        <div class="pwa-actions">
+            <button class="btn-pwa secondary" onclick="dismissInstall()">Not Now</button>
+            <button class="btn-pwa primary" onclick="installPWA()">Install</button>
         </div>
     </div>
-    <div class="pwa-actions">
-        <button class="btn-pwa secondary" onclick="dismissInstall()">Not Now</button>
-        <button class="btn-pwa primary" onclick="installPWA()">Install</button>
-    </div>
-</div>
 
     <script type="module" src="app.js"></script>
-        <script>
+    <script>
     // Register Service Worker
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
@@ -566,7 +590,7 @@
         deferredPrompt = null;
         console.log('PWA was installed');
     });
-</script>
+    </script>
 
 </body>
 </html>
