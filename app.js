@@ -751,7 +751,7 @@ setColor(c) {
         reader.readAsDataURL(file);
     }
     
-    clearLayer() { 
+        clearLayer() { 
         const layer = this.layerManager.getActive(); 
         if(layer) { 
             layer.ctx.clearRect(0,0,this.width,this.height); 
@@ -760,13 +760,14 @@ setColor(c) {
             this.requestRender(); 
         } 
     }
-     
+
+    initColorStudio() {   // <--- ADD THIS LINE HERE
         const modal = document.getElementById('color-studio-modal');
-        modal.className = 'cs-modal-overlay'; // Ensure class is applied
+        modal.className = 'cs-modal-overlay'; 
         
         modal.innerHTML = `
             <div style="pointer-events: auto; background:white; padding:20px; border-radius:24px; box-shadow:0 10px 40px rgba(0,0,0,0.2); width:320px; display:flex; flex-direction:column; align-items:center;">
-                <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+     <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
                     <h3 style="margin:0; font-size:18px; color:#333;">Color Studio 🎨</h3>
                     <button onclick="app.toggleColorStudio(false)" style="background:none; border:none; font-size:24px; cursor:pointer; color:#666;">&times;</button>
                 </div>
