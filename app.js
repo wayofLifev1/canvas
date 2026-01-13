@@ -446,15 +446,36 @@ class ProSketch {
         this.showToast(t.toUpperCase() + " Selected");
     }
 
-    setColor(c) { 
-        this.settings.color = c; 
-        document.getElementById('curr-color').style.background = c; 
-        if(!this.recentColors.includes(c)) {
-            this.recentColors.unshift(c);
-            if(this.recentColors.length > 7) this.recentColors.pop();
+setColor(c) { 
+    this.settings.color = c; 
+    document.getElementById('curr-color').style.background = c; 
+    if (c.startsWith('#')) {
+        const hex = c.replace('#', '');
+        const r = parseInt(hex.substring(0,2), 16) / 255;
+        const g = parseInt(hex.substring(2,4), 16) / 255;
+        const b = parseInt(hex.substring(4,6), 16) / 255;
+        
+        const max = Math.max(r, g, b), min = Math.min(r, g, b);
+        let h, s, v = max;
+        const d = max - min;
+        s = max === 0 ? 0 : d / max;
+        if (max === min) h = 0;
+        else {
+            switch (max) {
+                case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                case g: h = (b - r) / d + 2; break;
+                case b: h = (r - g) / d + 4; break;
+            }
+            h /= 6;
         }
+        this.colorState = { h: h * 360, s: s, v: v };
     }
-    
+
+    if(!this.recentColors.includes(c)) {
+        this.recentColors.unshift(c);
+        if(this.recentColors.length > 7) this.recentColors.pop();
+    }
+}
     updateSettings(k, v) { if(k === 'opacity') v = v/100; this.settings[k] = Number(v); }
 
     runPicker(e) {
@@ -633,10 +654,12 @@ class ProSketch {
     toggleGalleryModal(show) { document.getElementById('gallery-modal').style.display = show ? 'flex' : 'none'; if(show) this.refreshGalleryModal(); }
     toggleTemplateModal(show) { document.getElementById('template-modal').style.display = show === false ? 'none' : 'flex'; }
     toggleColorStudio(show) { 
-        document.getElementById('color-studio-modal').style.display = show ? 'flex' : 'none'; 
-        if(show) this.initColorStudio(); 
+    const modal = document.getElementById('color-studio-modal');
+    modal.style.display = show ? 'flex' : 'none'; 
+     if(show && !document.getElementById('cs-sb-canvas')) {
+        this.initColorStudio(); 
     }
-    
+}
     bindShortcuts() {
         window.addEventListener('keydown', (e) => {
             if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); e.shiftKey ? this.redo() : this.undo(); }
@@ -886,12 +909,13 @@ class ProSketch {
     }
 
     setLayerOpacity(id, val) {
-        const layer = this.layerManager.layers.find(l => l.id === id);
-        if (layer) {
-            layer.opacity = parseInt(val) / 100;
-            this.requestRender(); 
-            this.refreshUI(); 
-        }
+    const layer = this.layerManager.layers.find(l => l.id === id);
+    if (layer) {
+        layer.opacity = parseInt(val) / 100;
+        this.requestRender(); 
+     const textSpan = document.querySelector(`input[oninput*="${id}"]`).nextElementSibling;
+        if(textSpan) textSpan.textContent = Math.round(layer.opacity * 100) + '%';
+    }
     }
 
     setLayerActive(id) {
