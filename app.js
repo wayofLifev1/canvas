@@ -653,17 +653,24 @@ setColor(c) {
 
     toggleGalleryModal(show) { document.getElementById('gallery-modal').style.display = show ? 'flex' : 'none'; if(show) this.refreshGalleryModal(); }
     toggleTemplateModal(show) { document.getElementById('template-modal').style.display = show === false ? 'none' : 'flex'; }
-    toggleColorStudio(show) { 
-        const modal = document.getElementById('color-studio-modal');
-        if (!modal) return; // Safety check
+        toggleColorStudio(show) { 
+        let modal = document.getElementById('color-studio-modal');
+        
+        // AUTO-FIX: Create the modal if it's missing in HTML
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'color-studio-modal';
+            modal.className = 'cs-modal-overlay';
+            document.body.appendChild(modal);
+        }
         
         modal.style.display = show ? 'flex' : 'none'; 
         
-        // Only run initialization if we haven't created the canvas yet
         if(show && !document.getElementById('cs-sb-canvas')) {
             this.initColorStudio(); 
         }
     }
+    
 clearLayer() { 
         const layer = this.layerManager.getActive(); 
         if(layer) { 
