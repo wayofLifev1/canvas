@@ -653,10 +653,10 @@ setColor(c) {
 
     toggleGalleryModal(show) { document.getElementById('gallery-modal').style.display = show ? 'flex' : 'none'; if(show) this.refreshGalleryModal(); }
     toggleTemplateModal(show) { document.getElementById('template-modal').style.display = show === false ? 'none' : 'flex'; }
-        toggleColorStudio(show) { 
+  toggleColorStudio(show) { 
         let modal = document.getElementById('color-studio-modal');
         
-        // AUTO-FIX: Create the modal if it's missing in HTML
+        // AUTO-FIX: Create the modal if it is missing from HTML
         if (!modal) {
             modal = document.createElement('div');
             modal.id = 'color-studio-modal';
@@ -666,27 +666,18 @@ setColor(c) {
         
         modal.style.display = show ? 'flex' : 'none'; 
         
+        // Only init canvas if it doesn't exist yet
         if(show && !document.getElementById('cs-sb-canvas')) {
             this.initColorStudio(); 
         }
     }
-    
-clearLayer() { 
-        const layer = this.layerManager.getActive(); 
-        if(layer) { 
-            layer.ctx.clearRect(0,0,this.width,this.height); 
-            this.history.push({type:'clear', layerId:layer.id}); 
-            this.sound.play('trash'); 
-            this.requestRender(); 
-        } 
-}
-    initColorStudio() {   // <--- ADD THIS LINE HERE
+
+    initColorStudio() {
         const modal = document.getElementById('color-studio-modal');
-        modal.className = 'cs-modal-overlay'; 
-        
+        // 1. Inject HTML
         modal.innerHTML = `
             <div style="pointer-events: auto; background:white; padding:20px; border-radius:24px; box-shadow:0 10px 40px rgba(0,0,0,0.2); width:320px; display:flex; flex-direction:column; align-items:center;">
-     <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
                     <h3 style="margin:0; font-size:18px; color:#333;">Color Studio 🎨</h3>
                     <button onclick="app.toggleColorStudio(false)" style="background:none; border:none; font-size:24px; cursor:pointer; color:#666;">&times;</button>
                 </div>
@@ -696,12 +687,10 @@ clearLayer() {
                         <canvas id="cs-sb-canvas" width="220" height="220" style="width:220px; height:220px; display:block;"></canvas>
                         <div id="cs-sb-cursor" class="cs-cursor"></div>
                     </div>
-                    
                     <div class="cs-hue-wrapper" id="cs-hue-rail">
                         <canvas id="cs-hue-canvas" width="220" height="30" style="width:220px; height:30px; display:block; border-radius:15px;"></canvas>
                         <div id="cs-hue-thumb" class="cs-slider-thumb"></div>
                     </div>
-                    
                     <div class="cs-hex-row">
                         <div id="cs-preview" style="width:40px; height:40px; border-radius:10px; background:${this.settings.color}; box-shadow:inset 0 0 0 1px rgba(0,0,0,0.1);"></div>
                         <div style="display:flex; flex-direction:column; gap:2px;">
@@ -710,14 +699,13 @@ clearLayer() {
                         </div>
                         <button onclick="app.toggleColorStudio(false)" style="background:#6366f1; color:white; border:none; padding:8px 16px; border-radius:8px; font-weight:bold; cursor:pointer;">Done</button>
                     </div>
-
                     <div class="cs-swatch-grid" id="cs-recent-grid"></div>
                 </div>
             </div>
         `;
 
-        // --- DRAWING LOGIC ---
-        setTimeout(() => { // Small delay ensures DOM elements exist
+        // 2. Run Drawing Logic (This fixes the Blank White issue)
+        setTimeout(() => { 
             const sbCanvas = document.getElementById('cs-sb-canvas');
             const hueCanvas = document.getElementById('cs-hue-canvas');
             if(!sbCanvas || !hueCanvas) return;
@@ -725,7 +713,7 @@ clearLayer() {
             const sbCtx = sbCanvas.getContext('2d');
             const hueCtx = hueCanvas.getContext('2d');
 
-            // 1. Draw Static Hue Rail
+            // Draw Static Hue Rail
             const hueGrad = hueCtx.createLinearGradient(0, 0, hueCanvas.width, 0);
             for(let i=0; i<=360; i+=60) hueGrad.addColorStop(i/360, `hsl(${i}, 100%, 50%)`);
             hueCtx.fillStyle = hueGrad; 
@@ -737,7 +725,7 @@ clearLayer() {
             };
 
             const updateUI = () => {
-                // Draw S/B Box
+                // Draw Saturation/Brightness Box
                 sbCtx.clearRect(0,0,220,220);
                 sbCtx.fillStyle = `hsl(${this.colorState.h}, 100%, 50%)`;
                 sbCtx.fillRect(0, 0, 220, 220);
@@ -757,14 +745,12 @@ clearLayer() {
                 
                 const hueThumb = document.getElementById('cs-hue-thumb');
                 const sbCursor = document.getElementById('cs-sb-cursor');
-                
                 if(hueThumb) hueThumb.style.left = hueX + 'px';
                 if(sbCursor) { sbCursor.style.left = sbX + 'px'; sbCursor.style.top = sbY + 'px'; }
                 
                 const hex = this.hsvToHex(this.colorState.h, this.colorState.s, this.colorState.v);
                 const preview = document.getElementById('cs-preview');
                 const input = document.getElementById('cs-hex-input');
-                
                 if(preview) preview.style.background = hex;
                 if(input && document.activeElement !== input) input.value = hex;
                 
@@ -830,6 +816,7 @@ clearLayer() {
         const toHex = x => { const val = Math.round(x * 255).toString(16); return val.length === 1 ? '0' + val : val; };
         return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
     }
+
                 // --- TEMPLATE: Helper Functions for Layer UI ---
 
     createNewLayer() {
