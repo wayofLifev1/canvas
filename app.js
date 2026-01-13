@@ -664,7 +664,15 @@ setColor(c) {
             this.initColorStudio(); 
         }
     }
-
+clearLayer() { 
+        const layer = this.layerManager.getActive(); 
+        if(layer) { 
+            layer.ctx.clearRect(0,0,this.width,this.height); 
+            this.history.push({type:'clear', layerId:layer.id}); 
+            this.sound.play('trash'); 
+            this.requestRender(); 
+        } 
+}
     initColorStudio() {   // <--- ADD THIS LINE HERE
         const modal = document.getElementById('color-studio-modal');
         modal.className = 'cs-modal-overlay'; 
