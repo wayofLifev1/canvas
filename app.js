@@ -20,7 +20,7 @@ class ProSketch {
         this.isDrawing = false;
         this.isGesture = false;
         
-        // Color State (H: 0-360, S: 0-1, V: 0-1)
+        // Color State
         this.colorState = { h: 240, s: 1, v: 1 }; 
         this.recentColors = ['#000000', '#ffffff', '#ff0000', '#00ff00', '#0000ff'];
         
@@ -66,7 +66,7 @@ class ProSketch {
         this.loadState();
         this.loadGallery();
         this.injectUI(); 
-        this.injectColorStyles(); // Add styles for new picker
+        this.injectColorStyles(); 
         this.requestRender();
     }
 
@@ -117,6 +117,7 @@ class ProSketch {
             const pos = this.toWorld(e.clientX, e.clientY);
             const tool = this.tools[this.settings.tool];
 
+            // FIX: Removed 'scissor' from this check so it draws freehand
             if (tool.type === 'shape') {
                 this.points[1] = [pos.x, pos.y, e.pressure||0.5];
                 this.renderLive();
@@ -271,9 +272,11 @@ class ProSketch {
         d.push("Z"); return d.join(" ");
     }
 
-        commitStroke() {
+    commitStroke() {
         // 1. Try to get the active layer
         let layer = this.layerManager.getActive();
+        
+        // FIX: Auto-Select logic to prevent "kickback"
         if (!layer || !layer.visible) {
             const firstVisible = this.layerManager.layers.find(l => l.visible);
             if (firstVisible) {
@@ -286,10 +289,11 @@ class ProSketch {
             }
         }
         
-            if (this.settings.tool === 'scissor') { this.performScissorCut(layer, this.points); return; }
+        if (this.settings.tool === 'scissor') { this.performScissorCut(layer, this.points); return; }
 
         const toolCfg = this.tools[this.settings.tool];
-           if (toolCfg.type === 'shape') {
+        
+        if (toolCfg.type === 'shape') {
              if (this.points.length >= 2) {
                  this.drawGeometricShape(layer.ctx, this.points[0], this.points[1], toolCfg.shape, this.settings.color, this.settings.size, this.settings.opacity);
                  this.history.push({ 
@@ -387,7 +391,13 @@ class ProSketch {
     applyScissor(ctx, points) {
         ctx.save(); ctx.beginPath(); ctx.moveTo(points[0][0], points[0][1]);
         for(let i=1; i<points.length; i++) ctx.lineTo(points[i][0], points[i][1]);
-        ctx.closePath(); ctx.globalCompositeOperation = 'destination-in'; ctx.fillStyle = 'black'; ctx.fill(); ctx.restore();
+        ctx.closePath(); 
+        
+        // NOTE: 'destination-in' acts like a Crop (keeps selection).
+        // Change to 'destination-out' if you want to Cut/Erase (hole punch).
+        ctx.globalCompositeOperation = 'destination-in'; 
+        
+        ctx.fillStyle = 'black'; ctx.fill(); ctx.restore();
     }
 
     promptText(x, y) {
@@ -555,84 +565,12 @@ class ProSketch {
         this.requestRender();
     }
 
-        refreshUI() {
-        const content = document.getElementById('panel-content');
-        if (!content || !this.currentPanel) return;
-
-        if (this.currentPanel === 'layers') {
-            // 1. Build Layer List HTML manually to include Opacity & Delete
-            const layersHTML = this.layerManager.layers.slice().reverse().map(layer => {
-                const isActive = layer.id === this.layerManager.activeId ? 'active' : '';
-                return `
-                <div class="layer-item ${isActive}" style="display:flex; flex-direction:column; gap:5px; padding:10px; border:2px solid ${isActive ? '#6366f1' : '#f1f5f9'}; border-radius:12px; margin-bottom:8px;">
-                    
-                    <div style="display:flex; align-items:center; justify-content:space-between; width:100%;">
-                        <div onclick="app.toggleLayerVis('${layer.id}')" style="cursor:pointer; font-size:18px; width:30px;">
-                            ${layer.visible ? '👁️' : '🔒'}
-                        </div>
-                        
-                        <div onclick="app.setLayerActive('${layer.id}')" style="flex:1; font-weight:bold; cursor:pointer; color:#334155;">
-                            ${layer.name}
-                        </div>
-
-                        <div onclick="app.deleteLayer('${layer.id}')" style="cursor:pointer; color:#ef4444; font-size:16px; padding:5px;">
-                            🗑️
-                        </div>
-                    </div>
-
-                    <div style="display:flex; align-items:center; gap:10px; margin-top:5px;">
-                        <span style="font-size:10px; font-weight:bold; color:#94a3b8;">OPACITY</span>
-                        <input type="range" min="0" max="100" value="${layer.opacity * 100}" 
-                            oninput="app.setLayerOpacity('${layer.id}', this.value)" 
-                            onpointerdown="event.stopPropagation()"
-                            style="flex:1; height:4px; accent-color:#6366f1;">
-                        <span style="font-size:10px; color:#64748b; width:25px; text-align:right;">${Math.round(layer.opacity * 100)}%</span>
-                    </div>
-                </div>`;
-            }).join('');
-
-            // 2. Add the "New Layer" button at the bottom
-            content.innerHTML = layersHTML + `
-                <div onclick="app.createNewLayer()" class="layer-item" style="justify-content:center; border:2px dashed #cbd5e1; color:#64748b; cursor:pointer; margin-top:10px;">
-                    + New Layer
-                </div>
-            `;
-
-        } else if (this.currentPanel === 'settings') {
-            // Settings Panel (Unchanged)
-            content.innerHTML = `
-                <div style="margin-bottom:20px;">
-                     <div style="font-size:14px; font-weight:600; color:#888;">FILTERS 🪄</div>
-                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;">
-                        <button onclick="app.triggerFilter('grayscale')" class="btn-filter">BW</button>
-                        <button onclick="app.triggerFilter('sepia')" class="btn-filter">Sepia</button>
-                        <button onclick="app.triggerFilter('invert')" class="btn-filter">Invert</button>
-                     </div>
-                </div>
-                <div class="layer-item" onclick="app.resetView()" style="font-weight:bold; color:#6366f1;">🔍 Fit to Screen</div>
-                <div class="layer-item" onclick="app.fullReset()" style="color:var(--danger); font-weight:bold;">🗑️ Clear All</div>
-            `;
-        }
-    }
-    // --- NEW LAYER MANAGEMENT FUNCTIONS ---
-
-    createNewLayer() {
-        const newLayer = this.layerManager.addLayer(`Layer ${this.layerManager.layers.length + 1}`);
-        this.layerManager.setActive(newLayer.id);
-        this.refreshUI();
-        this.showToast("Layer Added 📄");
-    }
-
-    deleteLayer(id) {
-        // Prevent deleting the last remaining layer
-        if (this.layerManager.layers.length <= 1) {
-            this.showToast("Cannot delete last layer!");
+    // FIX: Updated refreshUI to include Opacity Slider and Delete Button
     refreshUI() {
         const content = document.getElementById('panel-content');
         if (!content || !this.currentPanel) return;
 
         if (this.currentPanel === 'layers') {
-            // TEMPLATE: Layer List with Opacity & Delete
             const layersHTML = this.layerManager.layers.slice().reverse().map(layer => {
                 const isActive = layer.id === this.layerManager.activeId ? 'active' : '';
                 return `
@@ -665,7 +603,6 @@ class ProSketch {
                 </div>
             `;
         } else if (this.currentPanel === 'settings') {
-            // Settings Panel Template
             content.innerHTML = `
                 <div style="margin-bottom:20px;">
                      <div style="font-size:14px; font-weight:600; color:#888;">FILTERS 🪄</div>
@@ -680,7 +617,7 @@ class ProSketch {
             `;
         }
     }
-            
+
     triggerFilter(type) {
         const layer = this.layerManager.getActive(); if(!layer) return;
         this.applyFilter(type, layer); this.history.push({ type: 'filter', layerId: layer.id, filterType: type }); this.requestRender();
@@ -776,7 +713,6 @@ class ProSketch {
                 const newLayer = this.layerManager.addLayer('Imported Image'); 
                 this.layerManager.setActive(newLayer.id); 
                 const scale = Math.min(this.width / img.width, this.height / img.height); 
-                const scale = Math.min(this.width / img.width, this.height / img.height); 
                 const w = img.width * scale; const h = img.height * scale; 
                 const x = (this.width - w) / 2; const y = (this.height - h) / 2; 
                 newLayer.ctx.drawImage(img, x, y, w, h); 
@@ -799,11 +735,9 @@ class ProSketch {
     }
 
     // --- MI CANVAS STYLE COLOR STUDIO ---
-        // --- MI CANVAS STYLE COLOR STUDIO ---
     initColorStudio() {
         const modal = document.getElementById('color-studio-modal');
-        // Clear previous content and inject new layout
-        // FIX: Added 'pointer-events: auto' to the main container style below
+        // FIX: Added 'pointer-events: auto'
         modal.innerHTML = `
             <div style="pointer-events: auto; background:white; padding:20px; border-radius:24px; box-shadow:0 10px 40px rgba(0,0,0,0.2); width:320px; display:flex; flex-direction:column; align-items:center;">
                 <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -828,29 +762,23 @@ class ProSketch {
             </div>
         `;
         
-        // ... rest of the function remains the same ...
-        
         // Setup Logic
         const sbCanvas = document.getElementById('cs-sb-canvas');
         const hueCanvas = document.getElementById('cs-hue-canvas');
         const sbCtx = sbCanvas.getContext('2d');
         const hueCtx = hueCanvas.getContext('2d');
         
-        // Draw Hue Rail
         const hueGrad = hueCtx.createLinearGradient(0, 0, hueCanvas.width, 0);
         for(let i=0; i<=360; i+=60) hueGrad.addColorStop(i/360, `hsl(${i}, 100%, 50%)`);
         hueCtx.fillStyle = hueGrad; hueCtx.fillRect(0,0, hueCanvas.width, hueCanvas.height);
         
-        // Render Swatches
         const renderSwatches = () => {
             const grid = document.getElementById('cs-recent-grid');
             grid.innerHTML = this.recentColors.map(c => `<div class="cs-swatch" style="background:${c}" onclick="app.setColor('${c}'); app.toggleColorStudio(false);"></div>`).join('');
         };
         renderSwatches();
 
-        // Update UI Visuals from State
         const updateUI = () => {
-            // Draw S/B Box
             sbCtx.fillStyle = `hsl(${this.colorState.h}, 100%, 50%)`;
             sbCtx.fillRect(0, 0, 220, 220);
             const whiteGrad = sbCtx.createLinearGradient(0,0,220,0);
@@ -860,7 +788,6 @@ class ProSketch {
             blackGrad.addColorStop(0, 'transparent'); blackGrad.addColorStop(1, 'black');
             sbCtx.fillStyle = blackGrad; sbCtx.fillRect(0,0,220,220);
             
-            // Move Cursors
             const hueX = (this.colorState.h / 360) * 220;
             const sbX = this.colorState.s * 220;
             const sbY = (1 - this.colorState.v) * 220;
@@ -875,7 +802,6 @@ class ProSketch {
             this.setColor(hex);
         };
         
-        // Interaction Handlers
         const handleSB = (e) => {
             const rect = sbCanvas.getBoundingClientRect();
             let x = Math.max(0, Math.min(220, e.clientX - rect.left));
@@ -922,7 +848,8 @@ class ProSketch {
         const toHex = x => { const val = Math.round(x * 255).toString(16); return val.length === 1 ? '0' + val : val; };
         return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
     }
-                // --- TEMPLATE: Helper Functions for Layer UI ---
+
+    // --- FIX: ADDED MISSING HELPER FUNCTIONS HERE ---
 
     createNewLayer() {
         const newLayer = this.layerManager.addLayer(`Layer ${this.layerManager.layers.length + 1}`);
