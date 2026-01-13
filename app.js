@@ -614,60 +614,11 @@ class ProSketch {
             `;
         }
     }
-    // --- CORRECTED LAYER MANAGEMENT FUNCTIONS ---
-
-    createNewLayer() {
-        const newLayer = this.layerManager.addLayer(`Layer ${this.layerManager.layers.length + 1}`);
-        this.layerManager.setActive(newLayer.id);
-        this.refreshUI();
-        this.showToast("Layer Added 📄");
-    }
-
-    deleteLayer(id) {
-        if (this.layerManager.layers.length <= 1) {
-            this.showToast("Cannot delete last layer!");
-            return;
-        }
-        const index = this.layerManager.layers.findIndex(l => l.id === id);
-        if (index > -1) {
-            this.layerManager.layers.splice(index, 1);
-            if (this.layerManager.activeId === id) {
-                this.layerManager.activeId = this.layerManager.layers[0].id;
-            }
-            this.sound.play('trash');
-            this.refreshUI(); 
-            this.requestRender(); 
-        }
-    }
-
-    setLayerOpacity(id, val) {
-        const layer = this.layerManager.layers.find(l => l.id === id);
-        if (layer) {
-            layer.opacity = parseInt(val) / 100;
-            this.requestRender(); 
-            this.refreshUI(); 
-        }
-    }
-
-    setLayerActive(id) {
-        this.layerManager.setActive(id);
-        this.refreshUI();
-    }
-
-    toggleLayerVis(id) {
-        const layer = this.layerManager.layers.find(l => l.id === id);
-        if (layer) {
-            layer.visible = !layer.visible;
-            this.requestRender();
-            this.refreshUI();
-        }
-    }
-
+            
     triggerFilter(type) {
         const layer = this.layerManager.getActive(); if(!layer) return;
         this.applyFilter(type, layer); this.history.push({ type: 'filter', layerId: layer.id, filterType: type }); this.requestRender();
     }
-
     applyFilter(type, layer, isReplay=false) {
         const imgData = layer.ctx.getImageData(0,0, this.width, this.height); const data = imgData.data;
         for(let i=0; i<data.length; i+=4) {
@@ -751,14 +702,17 @@ class ProSketch {
         ctx.stroke(); this.requestRender(); this.showToast(isColoring ? "Ready to Color! 🖍️" : "Trace the lines! ✏️");
         if (!isColoring) { const drawLayer = this.layerManager.addLayer('Practice Layer'); this.layerManager.setActive(drawLayer.id); guideLayer.opacity = 0.6; } 
     }
-    handleUpload(input) {
+        handleUpload(input) {
         const file = input.files[0]; if (!file) return; const reader = new FileReader();
         reader.onload = (e) => { 
             const img = new Image(); 
             img.onload = () => { 
                 const newLayer = this.layerManager.addLayer('Imported Image'); 
                 this.layerManager.setActive(newLayer.id); 
+                
+                // FIXED: Removed duplicate 'const scale' line
                 const scale = Math.min(this.width / img.width, this.height / img.height); 
+                
                 const w = img.width * scale; const h = img.height * scale; 
                 const x = (this.width - w) / 2; const y = (this.height - h) / 2; 
                 newLayer.ctx.drawImage(img, x, y, w, h); 
@@ -770,6 +724,7 @@ class ProSketch {
         }; 
         reader.readAsDataURL(file);
     }
+    
     clearLayer() { 
         const layer = this.layerManager.getActive(); 
         if(layer) { 
@@ -780,8 +735,12 @@ class ProSketch {
         } 
     }
 
+    // --- MI CANVAS STYLE COLOR STUDIO ---
+        // --- MI CANVAS STYLE COLOR STUDIO ---
     initColorStudio() {
         const modal = document.getElementById('color-studio-modal');
+        // Clear previous content and inject new layout
+        // FIX: Added 'pointer-events: auto' to the main container style below
         modal.innerHTML = `
             <div style="pointer-events: auto; background:white; padding:20px; border-radius:24px; box-shadow:0 10px 40px rgba(0,0,0,0.2); width:320px; display:flex; flex-direction:column; align-items:center;">
                 <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -806,22 +765,29 @@ class ProSketch {
             </div>
         `;
         
+        // ... rest of the function remains the same ...
+        
+        // Setup Logic
         const sbCanvas = document.getElementById('cs-sb-canvas');
         const hueCanvas = document.getElementById('cs-hue-canvas');
         const sbCtx = sbCanvas.getContext('2d');
         const hueCtx = hueCanvas.getContext('2d');
         
+        // Draw Hue Rail
         const hueGrad = hueCtx.createLinearGradient(0, 0, hueCanvas.width, 0);
         for(let i=0; i<=360; i+=60) hueGrad.addColorStop(i/360, `hsl(${i}, 100%, 50%)`);
         hueCtx.fillStyle = hueGrad; hueCtx.fillRect(0,0, hueCanvas.width, hueCanvas.height);
         
+        // Render Swatches
         const renderSwatches = () => {
             const grid = document.getElementById('cs-recent-grid');
             grid.innerHTML = this.recentColors.map(c => `<div class="cs-swatch" style="background:${c}" onclick="app.setColor('${c}'); app.toggleColorStudio(false);"></div>`).join('');
         };
         renderSwatches();
 
+        // Update UI Visuals from State
         const updateUI = () => {
+            // Draw S/B Box
             sbCtx.fillStyle = `hsl(${this.colorState.h}, 100%, 50%)`;
             sbCtx.fillRect(0, 0, 220, 220);
             const whiteGrad = sbCtx.createLinearGradient(0,0,220,0);
@@ -831,6 +797,7 @@ class ProSketch {
             blackGrad.addColorStop(0, 'transparent'); blackGrad.addColorStop(1, 'black');
             sbCtx.fillStyle = blackGrad; sbCtx.fillRect(0,0,220,220);
             
+            // Move Cursors
             const hueX = (this.colorState.h / 360) * 220;
             const sbX = this.colorState.s * 220;
             const sbY = (1 - this.colorState.v) * 220;
@@ -845,6 +812,7 @@ class ProSketch {
             this.setColor(hex);
         };
         
+        // Interaction Handlers
         const handleSB = (e) => {
             const rect = sbCanvas.getBoundingClientRect();
             let x = Math.max(0, Math.min(220, e.clientX - rect.left));
@@ -890,6 +858,54 @@ class ProSketch {
         }
         const toHex = x => { const val = Math.round(x * 255).toString(16); return val.length === 1 ? '0' + val : val; };
         return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+    }
+                // --- TEMPLATE: Helper Functions for Layer UI ---
+
+    createNewLayer() {
+        const newLayer = this.layerManager.addLayer(`Layer ${this.layerManager.layers.length + 1}`);
+        this.layerManager.setActive(newLayer.id);
+        this.refreshUI();
+        this.showToast("Layer Added 📄");
+    }
+
+    deleteLayer(id) {
+        if (this.layerManager.layers.length <= 1) {
+            this.showToast("Cannot delete last layer!");
+            return;
+        }
+        const index = this.layerManager.layers.findIndex(l => l.id === id);
+        if (index > -1) {
+            this.layerManager.layers.splice(index, 1);
+            if (this.layerManager.activeId === id) {
+                this.layerManager.activeId = this.layerManager.layers[0].id;
+            }
+            this.sound.play('trash');
+            this.refreshUI(); 
+            this.requestRender(); 
+        }
+    }
+
+    setLayerOpacity(id, val) {
+        const layer = this.layerManager.layers.find(l => l.id === id);
+        if (layer) {
+            layer.opacity = parseInt(val) / 100;
+            this.requestRender(); 
+            this.refreshUI(); 
+        }
+    }
+
+    setLayerActive(id) {
+        this.layerManager.setActive(id);
+        this.refreshUI();
+    }
+
+    toggleLayerVis(id) {
+        const layer = this.layerManager.layers.find(l => l.id === id);
+        if (layer) {
+            layer.visible = !layer.visible;
+            this.requestRender();
+            this.refreshUI();
+        }
     }
 }
 window.app = new ProSketch();
