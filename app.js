@@ -66,7 +66,7 @@ class ProSketch {
         this.loadState();
         this.loadGallery();
         this.injectUI(); 
-        this.injectColorStyles(); // Add styles for new picker
+        this.injectColorStyles(); 
         this.requestRender();
     }
 
