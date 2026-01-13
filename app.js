@@ -555,10 +555,51 @@ class ProSketch {
         this.requestRender();
     }
 
-    refreshUI() {
-        const content = document.getElementById('panel-content'); if(!content || !this.currentPanel) return;
-        if(this.currentPanel === 'layers') { content.innerHTML = this.layerManager.renderListHTML(); } 
-        else if(this.currentPanel === 'settings') {
+        refreshUI() {
+        const content = document.getElementById('panel-content');
+        if (!content || !this.currentPanel) return;
+
+        if (this.currentPanel === 'layers') {
+            // 1. Build Layer List HTML manually to include Opacity & Delete
+            const layersHTML = this.layerManager.layers.slice().reverse().map(layer => {
+                const isActive = layer.id === this.layerManager.activeId ? 'active' : '';
+                return `
+                <div class="layer-item ${isActive}" style="display:flex; flex-direction:column; gap:5px; padding:10px; border:2px solid ${isActive ? '#6366f1' : '#f1f5f9'}; border-radius:12px; margin-bottom:8px;">
+                    
+                    <div style="display:flex; align-items:center; justify-content:space-between; width:100%;">
+                        <div onclick="app.toggleLayerVis('${layer.id}')" style="cursor:pointer; font-size:18px; width:30px;">
+                            ${layer.visible ? '👁️' : '🔒'}
+                        </div>
+                        
+                        <div onclick="app.setLayerActive('${layer.id}')" style="flex:1; font-weight:bold; cursor:pointer; color:#334155;">
+                            ${layer.name}
+                        </div>
+
+                        <div onclick="app.deleteLayer('${layer.id}')" style="cursor:pointer; color:#ef4444; font-size:16px; padding:5px;">
+                            🗑️
+                        </div>
+                    </div>
+
+                    <div style="display:flex; align-items:center; gap:10px; margin-top:5px;">
+                        <span style="font-size:10px; font-weight:bold; color:#94a3b8;">OPACITY</span>
+                        <input type="range" min="0" max="100" value="${layer.opacity * 100}" 
+                            oninput="app.setLayerOpacity('${layer.id}', this.value)" 
+                            onpointerdown="event.stopPropagation()"
+                            style="flex:1; height:4px; accent-color:#6366f1;">
+                        <span style="font-size:10px; color:#64748b; width:25px; text-align:right;">${Math.round(layer.opacity * 100)}%</span>
+                    </div>
+                </div>`;
+            }).join('');
+
+            // 2. Add the "New Layer" button at the bottom
+            content.innerHTML = layersHTML + `
+                <div onclick="app.createNewLayer()" class="layer-item" style="justify-content:center; border:2px dashed #cbd5e1; color:#64748b; cursor:pointer; margin-top:10px;">
+                    + New Layer
+                </div>
+            `;
+
+        } else if (this.currentPanel === 'settings') {
+            // Settings Panel (Unchanged)
             content.innerHTML = `
                 <div style="margin-bottom:20px;">
                      <div style="font-size:14px; font-weight:600; color:#888;">FILTERS 🪄</div>
@@ -573,6 +614,63 @@ class ProSketch {
             `;
         }
     }
+    // --- NEW LAYER MANAGEMENT FUNCTIONS ---
+
+    createNewLayer() {
+        const newLayer = this.layerManager.addLayer(`Layer ${this.layerManager.layers.length + 1}`);
+        this.layerManager.setActive(newLayer.id);
+        this.refreshUI();
+        this.showToast("Layer Added 📄");
+    }
+
+    deleteLayer(id) {
+        // Prevent deleting the last remaining layer
+        if (this.layerManager.layers.length <= 1) {
+            this.showToast("Cannot delete last layer!");
+            return;
+        }
+
+        const index = this.layerManager.layers.findIndex(l => l.id === id);
+        if (index > -1) {
+            this.layerManager.layers.splice(index, 1);
+            
+            // If we deleted the active layer, pick a new one
+            if (this.layerManager.activeId === id) {
+                this.layerManager.activeId = this.layerManager.layers[0].id;
+            }
+            
+            this.sound.play('trash');
+            this.refreshUI(); // Refresh the list
+            this.requestRender(); // Redraw canvas
+        }
+    }
+
+    setLayerOpacity(id, val) {
+        const layer = this.layerManager.layers.find(l => l.id === id);
+        if (layer) {
+            layer.opacity = parseInt(val) / 100;
+            this.requestRender(); // Update canvas in real-time
+            
+            // Update the percentage text next to the slider
+            // (Optional optimization: Update DOM directly instead of full refresh for speed)
+            this.refreshUI(); 
+        }
+    }
+
+    setLayerActive(id) {
+        this.layerManager.setActive(id);
+        this.refreshUI();
+    }
+
+    toggleLayerVis(id) {
+        const layer = this.layerManager.layers.find(l => l.id === id);
+        if (layer) {
+            layer.visible = !layer.visible;
+            this.requestRender();
+            this.refreshUI();
+        }
+    }
+
     triggerFilter(type) {
         const layer = this.layerManager.getActive(); if(!layer) return;
         this.applyFilter(type, layer); this.history.push({ type: 'filter', layerId: layer.id, filterType: type }); this.requestRender();
