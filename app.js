@@ -404,8 +404,10 @@ class ProSketch {
         ctx.save(); ctx.font = `bold ${size}px sans-serif`; ctx.fillStyle = color; ctx.fillText(text, x, y); ctx.restore();
     }
 
-    injectUI() {
+        injectUI() {
         const caseItems = document.getElementById('case-items');
+        if (!caseItems) return; // Safety check
+
         const tools = [
             { id: 't-bucket', icon: '🪣', tool: 'bucket' }, { id: 't-scissor', icon: '✂️', tool: 'scissor' },
             { id: 't-rect', icon: '⬜', tool: 'rect' }, { id: 't-circle', icon: '⭕', tool: 'circle' },
@@ -413,15 +415,24 @@ class ProSketch {
         ];
         tools.forEach(t => {
             if (!document.getElementById(t.id)) {
-                const div = document.createElement('div'); div.className = 'case-tool'; div.id = t.id; div.onclick = () => this.setTool(t.tool); div.textContent = t.icon; caseItems.appendChild(div);
+                const div = document.createElement('div'); 
+                div.className = 'case-tool'; div.id = t.id; 
+                div.onclick = () => this.setTool(t.tool); 
+                div.textContent = t.icon; 
+                caseItems.appendChild(div);
             }
         });
+
         const topBarRight = document.querySelector('.top-bar > div:last-child');
-        if (!document.getElementById('btn-clear-layer')) {
-            const div = document.createElement('div'); div.className = 'btn-icon'; div.id = 'btn-clear-layer'; div.title = "Clear Layer"; div.onclick = () => this.clearLayer(); div.textContent = '🗑️'; div.style.color = '#ef4444'; topBarRight.insertBefore(div, topBarRight.firstChild);
+        if (topBarRight && !document.getElementById('btn-clear-layer')) {
+            const div = document.createElement('div'); 
+            div.className = 'btn-icon'; div.id = 'btn-clear-layer'; 
+            div.title = "Clear Layer"; 
+            div.onclick = () => this.clearLayer(); 
+            div.textContent = '🗑️'; div.style.color = '#ef4444'; 
+            topBarRight.insertBefore(div, topBarRight.firstChild);
         }
     }
-    
     injectColorStyles() {
         if(document.getElementById('cs-styles')) return;
         const css = `
@@ -578,14 +589,13 @@ setColor(c) {
         this.requestRender();
     }
 
-            refreshUI() {
+                refreshUI() {
         const content = document.getElementById('panel-content');
         if (!content || !this.currentPanel) return;
 
         if (this.currentPanel === 'layers') {
             const layersHTML = this.layerManager.layers.slice().reverse().map(layer => {
                 const isActive = layer.id === this.layerManager.activeId ? 'active' : '';
-                // Disable delete if it's the only layer
                 const canDelete = this.layerManager.layers.length > 1;
                 
                 return `
@@ -607,6 +617,38 @@ setColor(c) {
                     </div>
 
                     <div style="display:flex; align-items:center; gap:10px; margin-top:5px;">
+                        <span style="font-size:10px; font-weight:bold; color:#94a3b8;">OPACITY</span>
+                        <input type="range" min="0" max="100" value="${layer.opacity * 100}" 
+                            oninput="app.setLayerOpacity('${layer.id}', this.value)" 
+                            onpointerdown="event.stopPropagation()"
+                            style="flex:1; height:4px; accent-color:#6366f1;">
+                        <span style="font-size:10px; color:#64748b; width:25px; text-align:right;">${Math.round(layer.opacity * 100)}%</span>
+                    </div>
+                </div>`;
+            }).join('');
+
+            content.innerHTML = layersHTML + `
+                <div onclick="app.createNewLayer()" class="layer-item" style="justify-content:center; border:2px dashed #cbd5e1; color:#64748b; cursor:pointer; margin-top:10px; padding:10px; text-align:center; border-radius:12px;">
+                    + New Layer
+                </div>
+            `;
+
+        } else if (this.currentPanel === 'settings') {
+            content.innerHTML = `
+                <div style="margin-bottom:20px;">
+                     <div style="font-size:14px; font-weight:600; color:#888;">FILTERS 🪄</div>
+                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;">
+                        <button onclick="app.triggerFilter('grayscale')" class="btn-filter">BW</button>
+                        <button onclick="app.triggerFilter('sepia')" class="btn-filter">Sepia</button>
+                        <button onclick="app.triggerFilter('invert')" class="btn-filter">Invert</button>
+                     </div>
+                </div>
+                <div class="layer-item" onclick="app.resetView()" style="font-weight:bold; color:#6366f1; cursor:pointer; padding:10px;">🔍 Fit to Screen</div>
+                <div class="layer-item" onclick="app.fullReset()" style="color:#ef4444; font-weight:bold; cursor:pointer; padding:10px;">🗑️ Clear All</div>
+            `;
+        }
+    }
+    <div style="display:flex; align-items:center; gap:10px; margin-top:5px;">
                         <span style="font-size:10px; font-weight:bold; color:#94a3b8;">OPACITY</span>
                         <input type="range" min="0" max="100" value="${layer.opacity * 100}" 
                             oninput="app.setLayerOpacity('${layer.id}', this.value)" 
