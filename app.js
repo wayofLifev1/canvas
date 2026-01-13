@@ -423,7 +423,6 @@ class ProSketch {
     }
     
     injectColorStyles() {
-    injectColorStyles() {
         if(document.getElementById('cs-styles')) return;
         const css = `
         .cs-modal-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; display:none; justify-content:center; align-items:center; backdrop-filter:blur(2px); }
