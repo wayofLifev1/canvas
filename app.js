@@ -20,7 +20,7 @@ class ProSketch {
         this.isDrawing = false;
         this.isGesture = false;
         
-        // Color State
+        // Color State (H: 0-360, S: 0-1, V: 0-1)
         this.colorState = { h: 240, s: 1, v: 1 }; 
         this.recentColors = ['#000000', '#ffffff', '#ff0000', '#00ff00', '#0000ff'];
         
@@ -66,7 +66,7 @@ class ProSketch {
         this.loadState();
         this.loadGallery();
         this.injectUI(); 
-        this.injectColorStyles(); 
+        this.injectColorStyles(); // Add styles for new picker
         this.requestRender();
     }
 
@@ -117,7 +117,6 @@ class ProSketch {
             const pos = this.toWorld(e.clientX, e.clientY);
             const tool = this.tools[this.settings.tool];
 
-            // FIX: Removed 'scissor' from this check so it draws freehand
             if (tool.type === 'shape') {
                 this.points[1] = [pos.x, pos.y, e.pressure||0.5];
                 this.renderLive();
@@ -272,11 +271,9 @@ class ProSketch {
         d.push("Z"); return d.join(" ");
     }
 
-    commitStroke() {
+        commitStroke() {
         // 1. Try to get the active layer
         let layer = this.layerManager.getActive();
-        
-        // FIX: Auto-Select logic to prevent "kickback"
         if (!layer || !layer.visible) {
             const firstVisible = this.layerManager.layers.find(l => l.visible);
             if (firstVisible) {
@@ -289,11 +286,10 @@ class ProSketch {
             }
         }
         
-        if (this.settings.tool === 'scissor') { this.performScissorCut(layer, this.points); return; }
+            if (this.settings.tool === 'scissor') { this.performScissorCut(layer, this.points); return; }
 
         const toolCfg = this.tools[this.settings.tool];
-        
-        if (toolCfg.type === 'shape') {
+           if (toolCfg.type === 'shape') {
              if (this.points.length >= 2) {
                  this.drawGeometricShape(layer.ctx, this.points[0], this.points[1], toolCfg.shape, this.settings.color, this.settings.size, this.settings.opacity);
                  this.history.push({ 
@@ -391,13 +387,7 @@ class ProSketch {
     applyScissor(ctx, points) {
         ctx.save(); ctx.beginPath(); ctx.moveTo(points[0][0], points[0][1]);
         for(let i=1; i<points.length; i++) ctx.lineTo(points[i][0], points[i][1]);
-        ctx.closePath(); 
-        
-        // NOTE: 'destination-in' acts like a Crop (keeps selection).
-        // Change to 'destination-out' if you want to Cut/Erase (hole punch).
-        ctx.globalCompositeOperation = 'destination-in'; 
-        
-        ctx.fillStyle = 'black'; ctx.fill(); ctx.restore();
+        ctx.closePath(); ctx.globalCompositeOperation = 'destination-in'; ctx.fillStyle = 'black'; ctx.fill(); ctx.restore();
     }
 
     promptText(x, y) {
@@ -565,27 +555,31 @@ class ProSketch {
         this.requestRender();
     }
 
-    // FIX: Updated refreshUI to include Opacity Slider and Delete Button
-    refreshUI() {
+        refreshUI() {
         const content = document.getElementById('panel-content');
         if (!content || !this.currentPanel) return;
 
         if (this.currentPanel === 'layers') {
+            // 1. Build Layer List HTML manually to include Opacity & Delete
             const layersHTML = this.layerManager.layers.slice().reverse().map(layer => {
                 const isActive = layer.id === this.layerManager.activeId ? 'active' : '';
                 return `
                 <div class="layer-item ${isActive}" style="display:flex; flex-direction:column; gap:5px; padding:10px; border:2px solid ${isActive ? '#6366f1' : '#f1f5f9'}; border-radius:12px; margin-bottom:8px;">
+                    
                     <div style="display:flex; align-items:center; justify-content:space-between; width:100%;">
                         <div onclick="app.toggleLayerVis('${layer.id}')" style="cursor:pointer; font-size:18px; width:30px;">
                             ${layer.visible ? '👁️' : '🔒'}
                         </div>
+                        
                         <div onclick="app.setLayerActive('${layer.id}')" style="flex:1; font-weight:bold; cursor:pointer; color:#334155;">
                             ${layer.name}
                         </div>
+
                         <div onclick="app.deleteLayer('${layer.id}')" style="cursor:pointer; color:#ef4444; font-size:16px; padding:5px;">
                             🗑️
                         </div>
                     </div>
+
                     <div style="display:flex; align-items:center; gap:10px; margin-top:5px;">
                         <span style="font-size:10px; font-weight:bold; color:#94a3b8;">OPACITY</span>
                         <input type="range" min="0" max="100" value="${layer.opacity * 100}" 
@@ -597,12 +591,15 @@ class ProSketch {
                 </div>`;
             }).join('');
 
+            // 2. Add the "New Layer" button at the bottom
             content.innerHTML = layersHTML + `
                 <div onclick="app.createNewLayer()" class="layer-item" style="justify-content:center; border:2px dashed #cbd5e1; color:#64748b; cursor:pointer; margin-top:10px;">
                     + New Layer
                 </div>
             `;
+
         } else if (this.currentPanel === 'settings') {
+            // Settings Panel (Unchanged)
             content.innerHTML = `
                 <div style="margin-bottom:20px;">
                      <div style="font-size:14px; font-weight:600; color:#888;">FILTERS 🪄</div>
@@ -617,11 +614,60 @@ class ProSketch {
             `;
         }
     }
+    // --- CORRECTED LAYER MANAGEMENT FUNCTIONS ---
+
+    createNewLayer() {
+        const newLayer = this.layerManager.addLayer(`Layer ${this.layerManager.layers.length + 1}`);
+        this.layerManager.setActive(newLayer.id);
+        this.refreshUI();
+        this.showToast("Layer Added 📄");
+    }
+
+    deleteLayer(id) {
+        if (this.layerManager.layers.length <= 1) {
+            this.showToast("Cannot delete last layer!");
+            return;
+        }
+        const index = this.layerManager.layers.findIndex(l => l.id === id);
+        if (index > -1) {
+            this.layerManager.layers.splice(index, 1);
+            if (this.layerManager.activeId === id) {
+                this.layerManager.activeId = this.layerManager.layers[0].id;
+            }
+            this.sound.play('trash');
+            this.refreshUI(); 
+            this.requestRender(); 
+        }
+    }
+
+    setLayerOpacity(id, val) {
+        const layer = this.layerManager.layers.find(l => l.id === id);
+        if (layer) {
+            layer.opacity = parseInt(val) / 100;
+            this.requestRender(); 
+            this.refreshUI(); 
+        }
+    }
+
+    setLayerActive(id) {
+        this.layerManager.setActive(id);
+        this.refreshUI();
+    }
+
+    toggleLayerVis(id) {
+        const layer = this.layerManager.layers.find(l => l.id === id);
+        if (layer) {
+            layer.visible = !layer.visible;
+            this.requestRender();
+            this.refreshUI();
+        }
+    }
 
     triggerFilter(type) {
         const layer = this.layerManager.getActive(); if(!layer) return;
         this.applyFilter(type, layer); this.history.push({ type: 'filter', layerId: layer.id, filterType: type }); this.requestRender();
     }
+
     applyFilter(type, layer, isReplay=false) {
         const imgData = layer.ctx.getImageData(0,0, this.width, this.height); const data = imgData.data;
         for(let i=0; i<data.length; i+=4) {
@@ -734,10 +780,8 @@ class ProSketch {
         } 
     }
 
-    // --- MI CANVAS STYLE COLOR STUDIO ---
     initColorStudio() {
         const modal = document.getElementById('color-studio-modal');
-        // FIX: Added 'pointer-events: auto'
         modal.innerHTML = `
             <div style="pointer-events: auto; background:white; padding:20px; border-radius:24px; box-shadow:0 10px 40px rgba(0,0,0,0.2); width:320px; display:flex; flex-direction:column; align-items:center;">
                 <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -762,7 +806,6 @@ class ProSketch {
             </div>
         `;
         
-        // Setup Logic
         const sbCanvas = document.getElementById('cs-sb-canvas');
         const hueCanvas = document.getElementById('cs-hue-canvas');
         const sbCtx = sbCanvas.getContext('2d');
@@ -847,55 +890,6 @@ class ProSketch {
         }
         const toHex = x => { const val = Math.round(x * 255).toString(16); return val.length === 1 ? '0' + val : val; };
         return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-    }
-
-    // --- FIX: ADDED MISSING HELPER FUNCTIONS HERE ---
-
-    createNewLayer() {
-        const newLayer = this.layerManager.addLayer(`Layer ${this.layerManager.layers.length + 1}`);
-        this.layerManager.setActive(newLayer.id);
-        this.refreshUI();
-        this.showToast("Layer Added 📄");
-    }
-
-    deleteLayer(id) {
-        if (this.layerManager.layers.length <= 1) {
-            this.showToast("Cannot delete last layer!");
-            return;
-        }
-        const index = this.layerManager.layers.findIndex(l => l.id === id);
-        if (index > -1) {
-            this.layerManager.layers.splice(index, 1);
-            if (this.layerManager.activeId === id) {
-                this.layerManager.activeId = this.layerManager.layers[0].id;
-            }
-            this.sound.play('trash');
-            this.refreshUI(); 
-            this.requestRender(); 
-        }
-    }
-
-    setLayerOpacity(id, val) {
-        const layer = this.layerManager.layers.find(l => l.id === id);
-        if (layer) {
-            layer.opacity = parseInt(val) / 100;
-            this.requestRender(); 
-            this.refreshUI(); 
-        }
-    }
-
-    setLayerActive(id) {
-        this.layerManager.setActive(id);
-        this.refreshUI();
-    }
-
-    toggleLayerVis(id) {
-        const layer = this.layerManager.layers.find(l => l.id === id);
-        if (layer) {
-            layer.visible = !layer.visible;
-            this.requestRender();
-            this.refreshUI();
-        }
     }
 }
 window.app = new ProSketch();
