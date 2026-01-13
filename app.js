@@ -653,15 +653,16 @@ setColor(c) {
 
     toggleGalleryModal(show) { document.getElementById('gallery-modal').style.display = show ? 'flex' : 'none'; if(show) this.refreshGalleryModal(); }
     toggleTemplateModal(show) { document.getElementById('template-modal').style.display = show === false ? 'none' : 'flex'; }
-    toggleColorStudio(show) { }
-
- initColorStudio() {        
-    const modal = document.getElementById('color-studio-modal');
-    modal.style.display = show ? 'flex' : 'none'; 
-     if(show && !document.getElementById('cs-sb-canvas')) {
-        this.initColorStudio(); 
+    toggleColorStudio(show) { 
+        const modal = document.getElementById('color-studio-modal');
+        if (!modal) return;
+        modal.style.display = show ? 'flex' : 'none'; 
+        
+        // Only initialize the canvas if we are showing it and it hasn't been drawn yet
+        if(show && !document.getElementById('cs-sb-canvas')) {
+            this.initColorStudio(); 
+        }
     }
-}
     bindShortcuts() {
         window.addEventListener('keydown', (e) => {
             if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); e.shiftKey ? this.redo() : this.undo(); }
