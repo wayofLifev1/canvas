@@ -836,25 +836,7 @@ setColor(c) {
             this.requestRender(); 
         } 
     }
-    injectColorStyles() {
-        if(document.getElementById('cs-styles')) return;
-        const css = `
-        .cs-modal-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; display:none; justify-content:center; align-items:center; backdrop-filter:blur(2px); }
-        .cs-container { display:flex; flex-direction:column; align-items:center; gap:15px; width:100%; padding:5px; }
-        .cs-sb-wrapper { position:relative; width:220px; height:220px; border-radius:12px; overflow:hidden; box-shadow:0 4px 10px rgba(0,0,0,0.1); touch-action:none; background: #fff; cursor: crosshair; }
-        .cs-hue-wrapper { position:relative; width:220px; height:30px; border-radius:15px; margin-top:5px; touch-action:none; cursor: ew-resize; }
-        .cs-cursor { position:absolute; width:16px; height:16px; border:2px solid white; border-radius:50%; box-shadow:0 0 3px rgba(0,0,0,0.5); transform:translate(-50%, -50%); pointer-events:none; z-index: 10; }
-        .cs-slider-thumb { position:absolute; top:50%; width:16px; height:24px; background:white; border-radius:8px; border:1px solid #ccc; box-shadow:0 2px 4px rgba(0,0,0,0.2); transform:translate(-50%, -50%); pointer-events:none; z-index: 10; }
-        .cs-hex-row { display:flex; gap:10px; align-items:center; width:220px; justify-content:space-between; margin-top: 5px; }
-        .cs-hex-input { background:#f3f4f6; border:1px solid #e5e7eb; padding:8px 12px; border-radius:8px; font-family:monospace; font-size:14px; color:#444; width:100px; text-align:center; }
-        .cs-swatch-grid { display:flex; gap:8px; width:220px; flex-wrap:wrap; margin-top:10px; min-height: 30px;}
-        .cs-swatch { width:30px; height:30px; border-radius:50%; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.1); cursor:pointer; transition: transform 0.1s; }
-        .cs-swatch:active { transform: scale(0.9); }
-        `;
-        const s = document.createElement('style'); s.id = 'cs-styles'; s.innerHTML = css; document.head.appendChild(s);
-    }
-
-    initColorStudio() {
+     
         const modal = document.getElementById('color-studio-modal');
         modal.className = 'cs-modal-overlay'; // Ensure class is applied
         
