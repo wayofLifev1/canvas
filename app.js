@@ -272,24 +272,29 @@ class ProSketch {
     }
 
         commitStroke() {
+        // --- SMART LAYER SELECTION START ---
         // 1. Try to get the active layer
         let layer = this.layerManager.getActive();
+        
+        // 2. If current layer is missing or hidden, find one that works!
         if (!layer || !layer.visible) {
             const firstVisible = this.layerManager.layers.find(l => l.visible);
             if (firstVisible) {
                 this.layerManager.setActive(firstVisible.id);
                 layer = firstVisible;
-                this.showToast("Layer Auto-Selected 📄");
+                this.showToast("Layer Auto-Selected 📄"); // Notify the user
             } else {
                 this.showToast("No Visible Layers! 🚫");
                 return;
             }
         }
-        
-            if (this.settings.tool === 'scissor') { this.performScissorCut(layer, this.points); return; }
+        // --- SMART LAYER SELECTION END ---
+
+        if (this.settings.tool === 'scissor') { this.performScissorCut(layer, this.points); return; }
 
         const toolCfg = this.tools[this.settings.tool];
-           if (toolCfg.type === 'shape') {
+        
+        if (toolCfg.type === 'shape') {
              if (this.points.length >= 2) {
                  this.drawGeometricShape(layer.ctx, this.points[0], this.points[1], toolCfg.shape, this.settings.color, this.settings.size, this.settings.opacity);
                  this.history.push({ 
@@ -404,10 +409,8 @@ class ProSketch {
         ctx.save(); ctx.font = `bold ${size}px sans-serif`; ctx.fillStyle = color; ctx.fillText(text, x, y); ctx.restore();
     }
 
-            injectUI() {
+    injectUI() {
         const caseItems = document.getElementById('case-items');
-        if (!caseItems) return; // FIX: Prevents crash if element is missing
-
         const tools = [
             { id: 't-bucket', icon: '🪣', tool: 'bucket' }, { id: 't-scissor', icon: '✂️', tool: 'scissor' },
             { id: 't-rect', icon: '⬜', tool: 'rect' }, { id: 't-circle', icon: '⭕', tool: 'circle' },
@@ -419,25 +422,23 @@ class ProSketch {
             }
         });
         const topBarRight = document.querySelector('.top-bar > div:last-child');
-        if (topBarRight && !document.getElementById('btn-clear-layer')) {
+        if (!document.getElementById('btn-clear-layer')) {
             const div = document.createElement('div'); div.className = 'btn-icon'; div.id = 'btn-clear-layer'; div.title = "Clear Layer"; div.onclick = () => this.clearLayer(); div.textContent = '🗑️'; div.style.color = '#ef4444'; topBarRight.insertBefore(div, topBarRight.firstChild);
         }
     }
-
+    
     injectColorStyles() {
         if(document.getElementById('cs-styles')) return;
         const css = `
-        .cs-modal-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; display:none; justify-content:center; align-items:center; backdrop-filter:blur(2px); }
-        .cs-container { display:flex; flex-direction:column; align-items:center; gap:15px; width:100%; padding:5px; }
-        .cs-sb-wrapper { position:relative; width:220px; height:220px; border-radius:12px; overflow:hidden; box-shadow:0 4px 10px rgba(0,0,0,0.1); touch-action:none; background: #fff; cursor: crosshair; }
-        .cs-hue-wrapper { position:relative; width:220px; height:30px; border-radius:15px; margin-top:5px; touch-action:none; cursor: ew-resize; }
-        .cs-cursor { position:absolute; width:16px; height:16px; border:2px solid white; border-radius:50%; box-shadow:0 0 3px rgba(0,0,0,0.5); transform:translate(-50%, -50%); pointer-events:none; z-index: 10; }
-        .cs-slider-thumb { position:absolute; top:50%; width:16px; height:24px; background:white; border-radius:8px; border:1px solid #ccc; box-shadow:0 2px 4px rgba(0,0,0,0.2); transform:translate(-50%, -50%); pointer-events:none; z-index: 10; }
-        .cs-hex-row { display:flex; gap:10px; align-items:center; width:220px; justify-content:space-between; margin-top: 5px; }
-        .cs-hex-input { background:#f3f4f6; border:1px solid #e5e7eb; padding:8px 12px; border-radius:8px; font-family:monospace; font-size:14px; color:#444; width:100px; text-align:center; }
-        .cs-swatch-grid { display:flex; gap:8px; width:220px; flex-wrap:wrap; margin-top:10px; min-height: 30px;}
-        .cs-swatch { width:30px; height:30px; border-radius:50%; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.1); cursor:pointer; transition: transform 0.1s; }
-        .cs-swatch:active { transform: scale(0.9); }
+        .cs-container { display:flex; flex-direction:column; align-items:center; gap:15px; width:100%; padding:10px; }
+        .cs-sb-wrapper { position:relative; width:220px; height:220px; border-radius:12px; overflow:hidden; box-shadow:0 4px 10px rgba(0,0,0,0.1); touch-action:none; }
+        .cs-hue-wrapper { position:relative; width:220px; height:30px; border-radius:15px; margin-top:5px; touch-action:none; }
+        .cs-cursor { position:absolute; width:14px; height:14px; border:2px solid white; border-radius:50%; box-shadow:0 0 2px rgba(0,0,0,0.5); transform:translate(-50%, -50%); pointer-events:none; }
+        .cs-slider-thumb { position:absolute; top:50%; width:14px; height:24px; background:white; border-radius:8px; border:1px solid #ccc; box-shadow:0 2px 4px rgba(0,0,0,0.2); transform:translate(-50%, -50%); pointer-events:none; }
+        .cs-hex-row { display:flex; gap:10px; align-items:center; width:220px; justify-content:space-between; }
+        .cs-hex-input { background:#f3f4f6; border:none; padding:8px 12px; border-radius:8px; font-family:monospace; font-size:14px; color:#444; width:100px; text-align:center; }
+        .cs-swatch-grid { display:flex; gap:8px; width:220px; flex-wrap:wrap; margin-top:5px; }
+        .cs-swatch { width:30px; height:30px; border-radius:50%; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.1); cursor:pointer; }
         `;
         const s = document.createElement('style'); s.id = 'cs-styles'; s.innerHTML = css; document.head.appendChild(s);
     }
@@ -450,36 +451,15 @@ class ProSketch {
         this.showToast(t.toUpperCase() + " Selected");
     }
 
-setColor(c) { 
-    this.settings.color = c; 
-    document.getElementById('curr-color').style.background = c; 
-    if (c.startsWith('#')) {
-        const hex = c.replace('#', '');
-        const r = parseInt(hex.substring(0,2), 16) / 255;
-        const g = parseInt(hex.substring(2,4), 16) / 255;
-        const b = parseInt(hex.substring(4,6), 16) / 255;
-        
-        const max = Math.max(r, g, b), min = Math.min(r, g, b);
-        let h, s, v = max;
-        const d = max - min;
-        s = max === 0 ? 0 : d / max;
-        if (max === min) h = 0;
-        else {
-            switch (max) {
-                case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-                case g: h = (b - r) / d + 2; break;
-                case b: h = (r - g) / d + 4; break;
-            }
-            h /= 6;
+    setColor(c) { 
+        this.settings.color = c; 
+        document.getElementById('curr-color').style.background = c; 
+        if(!this.recentColors.includes(c)) {
+            this.recentColors.unshift(c);
+            if(this.recentColors.length > 7) this.recentColors.pop();
         }
-        this.colorState = { h: h * 360, s: s, v: v };
     }
-
-    if(!this.recentColors.includes(c)) {
-        this.recentColors.unshift(c);
-        if(this.recentColors.length > 7) this.recentColors.pop();
-    }
-}
+    
     updateSettings(k, v) { if(k === 'opacity') v = v/100; this.settings[k] = Number(v); }
 
     runPicker(e) {
@@ -566,203 +546,255 @@ setColor(c) {
         this.ctx.globalAlpha = 1; this.ctx.globalCompositeOperation = 'source-over'; 
     }
     
-        toggleProps(mode) {
-        // 1. Try to find the panel
-        let p = document.getElementById('main-panel');
-        
-        // 2. AUTO-FIX: Create panel if missing (Fixes Layer Button Crash)
-        if (!p) {
-            p = document.createElement('div');
-            p.id = 'main-panel';
-            p.className = 'side-panel';
-            p.innerHTML = `
-                <div class="panel-header">
-                    <span id="panel-title">Options</span>
-                    <span onclick="app.toggleProps(null)" style="cursor:pointer;">&times;</span>
-                </div>
-                <div id="panel-content"></div>
-            `;
-            document.body.appendChild(p);
-            
-            // Add CSS for the panel if it's missing
-            if (!document.getElementById('panel-styles')) {
-                const style = document.createElement('style');
-                style.id = 'panel-styles';
-                style.innerHTML = `
-                    .side-panel { position:fixed; bottom:-100%; left:0; width:100%; background:white; border-radius:20px 20px 0 0; padding:20px; transition:bottom 0.3s; box-shadow:0 -5px 20px rgba(0,0,0,0.1); z-index:1000; box-sizing:border-box; }
-                    .side-panel.active { bottom:0; }
-                    .panel-header { display:flex; justify-content:space-between; font-weight:bold; margin-bottom:15px; font-size:18px; }
-                `;
-                document.head.appendChild(style);
-            }
-        }
-
-        // 3. Normal Toggle Logic
-        if (!mode || (this.currentPanel === mode && p.classList.contains('active'))) { 
-            p.classList.remove('active'); 
-            this.currentPanel = null; 
-            return; 
-        }
-        
-        this.currentPanel = mode; 
-        p.classList.add('active');
-        
-        const titleEl = document.getElementById('panel-title');
-        if(titleEl) titleEl.textContent = mode === 'layers' ? 'My Pages' : 'Studio Options';
-        
+    toggleProps(mode) {
+        const p = document.getElementById('main-panel');
+        if (!mode || (this.currentPanel === mode && p.classList.contains('active'))) { p.classList.remove('active'); this.currentPanel = null; return; }
+        this.currentPanel = mode; p.classList.add('active');
+        document.getElementById('panel-title').textContent = mode === 'layers' ? 'My Pages' : 'Studio Options';
         this.refreshUI();
     }
 
-    toggleColorStudio(show) { 
-        let modal = document.getElementById('color-studio-modal');
-        
-        // AUTO-FIX: Create modal if missing (Fixes Color Button doing nothing)
-        if (!modal) {
-            modal = document.createElement('div');
-            modal.id = 'color-studio-modal';
-            modal.className = 'cs-modal-overlay';
-            document.body.appendChild(modal);
-        }
-        
-        modal.style.display = show ? 'flex' : 'none'; 
-        
-        // Only init canvas if showing and not already drawn
-        if(show && !document.getElementById('cs-sb-canvas')) {
-            this.initColorStudio(); 
-        }
+    fullReset() {
+        this.layerManager.init(2400, 1800);
+        this.history = []; this.redoStack = []; this.points = [];
+        this.requestRender();
     }
 
+    refreshUI() {
+        const content = document.getElementById('panel-content'); if(!content || !this.currentPanel) return;
+        if(this.currentPanel === 'layers') { content.innerHTML = this.layerManager.renderListHTML(); } 
+        else if(this.currentPanel === 'settings') {
+            content.innerHTML = `
+                <div style="margin-bottom:20px;">
+                     <div style="font-size:14px; font-weight:600; color:#888;">FILTERS 🪄</div>
+                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;">
+                        <button onclick="app.triggerFilter('grayscale')" class="btn-filter">BW</button>
+                        <button onclick="app.triggerFilter('sepia')" class="btn-filter">Sepia</button>
+                        <button onclick="app.triggerFilter('invert')" class="btn-filter">Invert</button>
+                     </div>
+                </div>
+                <div class="layer-item" onclick="app.resetView()" style="font-weight:bold; color:#6366f1;">🔍 Fit to Screen</div>
+                <div class="layer-item" onclick="app.fullReset()" style="color:var(--danger); font-weight:bold;">🗑️ Clear All</div>
+            `;
+        }
+    }
+    triggerFilter(type) {
+        const layer = this.layerManager.getActive(); if(!layer) return;
+        this.applyFilter(type, layer); this.history.push({ type: 'filter', layerId: layer.id, filterType: type }); this.requestRender();
+    }
+    applyFilter(type, layer, isReplay=false) {
+        const imgData = layer.ctx.getImageData(0,0, this.width, this.height); const data = imgData.data;
+        for(let i=0; i<data.length; i+=4) {
+            const r = data[i], g = data[i+1], b = data[i+2];
+            if (type === 'grayscale') { const v = 0.3*r + 0.59*g + 0.11*b; data[i]=data[i+1]=data[i+2]=v; }
+            else if (type === 'invert') { data[i]=255-r; data[i+1]=255-g; data[i+2]=255-b; }
+            else if (type === 'sepia') { data[i] = (r * .393) + (g *.769) + (b * .189); data[i+1] = (r * .349) + (g *.686) + (b * .168); data[i+2] = (r * .272) + (g *.534) + (b * .131); }
+        }
+        layer.ctx.putImageData(imgData, 0, 0);
+    }
+
+    toggleGalleryModal(show) { document.getElementById('gallery-modal').style.display = show ? 'flex' : 'none'; if(show) this.refreshGalleryModal(); }
+    toggleTemplateModal(show) { document.getElementById('template-modal').style.display = show === false ? 'none' : 'flex'; }
+    toggleColorStudio(show) { 
+        document.getElementById('color-studio-modal').style.display = show ? 'flex' : 'none'; 
+        if(show) this.initColorStudio(); 
+    }
+    
+    bindShortcuts() {
+        window.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); e.shiftKey ? this.redo() : this.undo(); }
+            if (e.key === '[') { this.updateSettings('size', Math.max(1, this.settings.size - 2)); this.showToast(`Size: ${this.settings.size}`); }
+            if (e.key === ']') { this.updateSettings('size', Math.min(100, this.settings.size + 2)); this.showToast(`Size: ${this.settings.size}`); }
+        });
+    }
+
+    saveToGallery() {
+        try {
+            const thumbCanvas = document.createElement('canvas'); const w = 300, h = 225; thumbCanvas.width = w; thumbCanvas.height = h;
+            const tCtx = thumbCanvas.getContext('2d'); tCtx.fillStyle = '#ffffff'; tCtx.fillRect(0, 0, w, h); tCtx.drawImage(this.canvas, 0, 0, w, h);
+            const thumbData = thumbCanvas.toDataURL('image/jpeg', 0.8);
+            
+            const workCanvas = document.createElement('canvas'); const scale = Math.min(800 / this.width, 800 / this.height);
+            workCanvas.width = this.width * scale; workCanvas.height = this.height * scale;
+            const wCtx = workCanvas.getContext('2d'); wCtx.fillStyle = '#ffffff'; wCtx.fillRect(0, 0, workCanvas.width, workCanvas.height); wCtx.drawImage(this.canvas, 0, 0, workCanvas.width, workCanvas.height);
+            const fullData = workCanvas.toDataURL('image/jpeg', 0.8);
+
+            const artItem = { id: Date.now(), date: new Date().toLocaleDateString(), thumb: thumbData, full: fullData };
+            this.gallery.unshift(artItem); if(this.gallery.length > 6) this.gallery.pop();
+            localStorage.setItem('prosketch-gallery', JSON.stringify(this.gallery)); this.showToast('Saved to Gallery! 📸'); 
+            this.sound.play('pop'); 
+            this.refreshGalleryModal();
+        } catch(e) { this.showToast('Storage Full! 📂'); }
+    }
+    loadGallery() { try { const g = localStorage.getItem('prosketch-gallery'); if(g) this.gallery = JSON.parse(g); } catch(e) {} }
+    deleteFromGallery(id) { 
+        this.gallery = this.gallery.filter(item => item.id !== id); 
+        localStorage.setItem('prosketch-gallery', JSON.stringify(this.gallery)); 
+        this.sound.play('trash'); 
+        this.refreshGalleryModal(); 
+    }
+    loadFromGallery(id) {
+        const item = this.gallery.find(x => x.id === id); if (!item) return; this.showToast("Loading Art... ⏳");
+        const img = new Image(); img.onload = () => { const newLayer = this.layerManager.addLayer('Loaded Art'); newLayer.ctx.drawImage(img, 0, 0, this.width, this.height); this.requestRender(); this.toggleGalleryModal(false); this.showToast('Art Loaded! 🎨'); };
+        img.src = item.full || item.thumb;
+    }
+    downloadFromGallery(id) {
+        const item = this.gallery.find(x => x.id === id); if (!item) return;
+        const link = document.createElement('a'); link.download = `Art-${id}.jpg`; link.href = item.full || item.thumb; 
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    }
+    refreshGalleryModal() {
+        const grid = document.getElementById('gallery-grid'); if (!grid) return;
+        if (this.gallery.length === 0) { grid.innerHTML = `<div style="text-align:center; color:#999; grid-column:1/-1;">No saved art yet! 🎨</div>`; return; }
+        grid.innerHTML = this.gallery.map(item => `
+            <div class="gallery-card"><img src="${item.thumb}" onclick="app.loadFromGallery(${item.id})"><div class="gallery-actions"><span>${item.date}</span><div style="display:flex; gap:10px;"><span onclick="app.downloadFromGallery(${item.id})" style="color:#6366f1; cursor:pointer;" title="Download PNG">⬇️</span><span onclick="app.deleteFromGallery(${item.id})" style="color:#ef4444; cursor:pointer;" title="Delete">🗑️</span></div></div></div>`).join('');
+    }
+    loadTemplate(type) {
+        this.toggleTemplateModal(false);
+        const guideLayer = this.layerManager.addLayer('Guide'); const ctx = guideLayer.ctx;
+        const w = this.width; const h = this.height; const cx = w / 2; const cy = h / 2;
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round'; const isColoring = type.startsWith('color');
+        if (isColoring) { ctx.strokeStyle = '#000000'; ctx.lineWidth = 15; ctx.setLineDash([]); } else { ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 10; ctx.setLineDash([25, 30]); }
+        ctx.beginPath();
+        if (type === 'line-h') { for(let i=1; i<5; i++) { const y = (h/5)*i; ctx.moveTo(200, y); ctx.lineTo(w-200, y); } } 
+        else if (type === 'line-z') { const step = 200; ctx.moveTo(100, cy); for(let x=100; x<w-100; x+=step) { ctx.lineTo(x + step/2, cy - 300); ctx.lineTo(x + step, cy + 300); } }
+        else if (type === 'shape-circle') { ctx.arc(cx, cy, 500, 0, Math.PI*2); }
+        else if (type === 'color-sun') { ctx.arc(cx, cy, 250, 0, Math.PI*2); for(let i=0; i<8; i++) { const angle = (i * 45) * Math.PI / 180; ctx.moveTo(cx + Math.cos(angle)*300, cy + Math.sin(angle)*300); ctx.lineTo(cx + Math.cos(angle)*500, cy + Math.sin(angle)*500); } }
+        ctx.stroke(); this.requestRender(); this.showToast(isColoring ? "Ready to Color! 🖍️" : "Trace the lines! ✏️");
+        if (!isColoring) { const drawLayer = this.layerManager.addLayer('Practice Layer'); this.layerManager.setActive(drawLayer.id); guideLayer.opacity = 0.6; } 
+    }
+    handleUpload(input) {
+        const file = input.files[0]; if (!file) return; const reader = new FileReader();
+        reader.onload = (e) => { 
+            const img = new Image(); 
+            img.onload = () => { 
+                const newLayer = this.layerManager.addLayer('Imported Image'); 
+                const scale = Math.min(this.width / img.width, this.height / img.height); 
+                const w = img.width * scale; const h = img.height * scale; 
+                const x = (this.width - w) / 2; const y = (this.height - h) / 2; 
+                newLayer.ctx.drawImage(img, x, y, w, h); 
+                this.history.push({ type: 'image', layerId: newLayer.id, img: img, x:x, y:y, w:w, h:h });
+                this.redoStack = [];
+                this.requestRender(); this.showToast('Image Imported! 📷'); input.value = ''; 
+            }; 
+            img.src = e.target.result; 
+        }; 
+        reader.readAsDataURL(file);
+    }
+    clearLayer() { 
+        const layer = this.layerManager.getActive(); 
+        if(layer) { 
+            layer.ctx.clearRect(0,0,this.width,this.height); 
+            this.history.push({type:'clear', layerId:layer.id}); 
+            this.sound.play('trash'); 
+            this.requestRender(); 
+        } 
+    }
     initColorStudio() {
         const modal = document.getElementById('color-studio-modal');
-        if (!modal) return;
-
+        // Clear previous content and inject new layout
+        // UPGRADE: Added 'pointer-events: auto' to stop clicks passing through to canvas
         modal.innerHTML = `
             <div style="pointer-events: auto; background:white; padding:20px; border-radius:24px; box-shadow:0 10px 40px rgba(0,0,0,0.2); width:320px; display:flex; flex-direction:column; align-items:center;">
-                <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                    <h3 style="margin:0; font-size:18px; color:#333;">Color Studio 🎨</h3>
-                    <button onclick="app.toggleColorStudio(false)" style="background:none; border:none; font-size:24px; cursor:pointer; color:#666;">&times;</button>
+                <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h3 style="margin:0; color:#333;">Color Studio</h3>
+                    <button onclick="app.toggleColorStudio(false)" style="background:none; border:none; font-size:20px; cursor:pointer;">✕</button>
                 </div>
-                
                 <div class="cs-container">
                     <div class="cs-sb-wrapper" id="cs-sb-box">
-                        <canvas id="cs-sb-canvas" width="220" height="220" style="width:220px; height:220px; display:block;"></canvas>
+                        <canvas id="cs-sb-canvas" width="220" height="220"></canvas>
                         <div id="cs-sb-cursor" class="cs-cursor"></div>
                     </div>
-                    
                     <div class="cs-hue-wrapper" id="cs-hue-rail">
-                        <canvas id="cs-hue-canvas" width="220" height="30" style="width:220px; height:30px; display:block; border-radius:15px;"></canvas>
+                        <canvas id="cs-hue-canvas" width="220" height="30" style="border-radius:15px;"></canvas>
                         <div id="cs-hue-thumb" class="cs-slider-thumb"></div>
                     </div>
-                    
                     <div class="cs-hex-row">
+                        <input id="cs-hex-input" class="cs-hex-input" value="${this.settings.color}" maxlength="7" spellcheck="false">
                         <div id="cs-preview" style="width:40px; height:40px; border-radius:10px; background:${this.settings.color}; box-shadow:inset 0 0 0 1px rgba(0,0,0,0.1);"></div>
-                        <div style="display:flex; flex-direction:column; gap:2px;">
-                            <span style="font-size:10px; color:#888; font-weight:600;">HEX CODE</span>
-                            <input id="cs-hex-input" class="cs-hex-input" value="${this.settings.color}" maxlength="7" spellcheck="false">
-                        </div>
-                        <button onclick="app.toggleColorStudio(false)" style="background:#6366f1; color:white; border:none; padding:8px 16px; border-radius:8px; font-weight:bold; cursor:pointer;">Done</button>
                     </div>
-
                     <div class="cs-swatch-grid" id="cs-recent-grid"></div>
                 </div>
             </div>
         `;
+        
+        // Setup Logic
+        const sbCanvas = document.getElementById('cs-sb-canvas');
+        const hueCanvas = document.getElementById('cs-hue-canvas');
+        const sbCtx = sbCanvas.getContext('2d');
+        const hueCtx = hueCanvas.getContext('2d');
+        
+        // Draw Hue Rail
+        const hueGrad = hueCtx.createLinearGradient(0, 0, hueCanvas.width, 0);
+        for(let i=0; i<=360; i+=60) hueGrad.addColorStop(i/360, `hsl(${i}, 100%, 50%)`);
+        hueCtx.fillStyle = hueGrad; hueCtx.fillRect(0,0, hueCanvas.width, hueCanvas.height);
+        
+        // Render Swatches
+        const renderSwatches = () => {
+            const grid = document.getElementById('cs-recent-grid');
+            grid.innerHTML = this.recentColors.map(c => `<div class="cs-swatch" style="background:${c}" onclick="app.setColor('${c}'); app.toggleColorStudio(false);"></div>`).join('');
+        };
+        renderSwatches();
 
-        // Wait for DOM then draw
-        setTimeout(() => { 
-            const sbCanvas = document.getElementById('cs-sb-canvas');
-            const hueCanvas = document.getElementById('cs-hue-canvas');
-            if(!sbCanvas || !hueCanvas) return;
-
-            const sbCtx = sbCanvas.getContext('2d');
-            const hueCtx = hueCanvas.getContext('2d');
-
-            const hueGrad = hueCtx.createLinearGradient(0, 0, hueCanvas.width, 0);
-            for(let i=0; i<=360; i+=60) hueGrad.addColorStop(i/360, `hsl(${i}, 100%, 50%)`);
-            hueCtx.fillStyle = hueGrad; 
-            hueCtx.fillRect(0,0, hueCanvas.width, hueCanvas.height);
-
-            const renderSwatches = () => {
-                const grid = document.getElementById('cs-recent-grid');
-                if(grid) grid.innerHTML = this.recentColors.map(c => `<div class="cs-swatch" style="background:${c}" onclick="app.setColor('${c}', false); app.toggleColorStudio(false);"></div>`).join('');
-            };
-
-            const updateUI = () => {
-                sbCtx.clearRect(0,0,220,220);
-                sbCtx.fillStyle = `hsl(${this.colorState.h}, 100%, 50%)`;
-                sbCtx.fillRect(0, 0, 220, 220);
-                
-                const whiteGrad = sbCtx.createLinearGradient(0,0,220,0);
-                whiteGrad.addColorStop(0, 'white'); whiteGrad.addColorStop(1, 'rgba(255,255,255,0)');
-                sbCtx.fillStyle = whiteGrad; sbCtx.fillRect(0,0,220,220);
-                
-                const blackGrad = sbCtx.createLinearGradient(0,0,0,220);
-                blackGrad.addColorStop(0, 'transparent'); blackGrad.addColorStop(1, 'black');
-                sbCtx.fillStyle = blackGrad; sbCtx.fillRect(0,0,220,220);
-                
-                const hueX = Math.min(220, Math.max(0, (this.colorState.h / 360) * 220));
-                const sbX = Math.min(220, Math.max(0, this.colorState.s * 220));
-                const sbY = Math.min(220, Math.max(0, (1 - this.colorState.v) * 220));
-                
-                const hueThumb = document.getElementById('cs-hue-thumb');
-                const sbCursor = document.getElementById('cs-sb-cursor');
-                
-                if(hueThumb) hueThumb.style.left = hueX + 'px';
-                if(sbCursor) { sbCursor.style.left = sbX + 'px'; sbCursor.style.top = sbY + 'px'; }
-                
-                const hex = this.hsvToHex(this.colorState.h, this.colorState.s, this.colorState.v);
-                const preview = document.getElementById('cs-preview');
-                const input = document.getElementById('cs-hex-input');
-                
-                if(preview) preview.style.background = hex;
-                if(input && document.activeElement !== input) input.value = hex;
-                
-                this.setColor(hex, false); 
-            };
-
-            // Event Handlers
-            const handleSB = (e) => {
-                const rect = sbCanvas.getBoundingClientRect();
-                let x = Math.max(0, Math.min(220, e.clientX - rect.left));
-                let y = Math.max(0, Math.min(220, e.clientY - rect.top));
-                this.colorState.s = x / 220;
-                this.colorState.v = 1 - (y / 220);
-                updateUI();
-            };
+        // Update UI Visuals from State
+        const updateUI = () => {
+            // Draw S/B Box
+            sbCtx.fillStyle = `hsl(${this.colorState.h}, 100%, 50%)`;
+            sbCtx.fillRect(0, 0, 220, 220);
+            const whiteGrad = sbCtx.createLinearGradient(0,0,220,0);
+            whiteGrad.addColorStop(0, 'white'); whiteGrad.addColorStop(1, 'rgba(255,255,255,0)');
+            sbCtx.fillStyle = whiteGrad; sbCtx.fillRect(0,0,220,220);
+            const blackGrad = sbCtx.createLinearGradient(0,0,0,220);
+            blackGrad.addColorStop(0, 'transparent'); blackGrad.addColorStop(1, 'black');
+            sbCtx.fillStyle = blackGrad; sbCtx.fillRect(0,0,220,220);
             
-            const handleHue = (e) => {
-                const rect = hueCanvas.getBoundingClientRect();
-                let x = Math.max(0, Math.min(220, e.clientX - rect.left));
-                this.colorState.h = (x / 220) * 360;
-                updateUI();
-            };
-
-            const sbBox = document.getElementById('cs-sb-box');
-            sbBox.onpointerdown = (e) => { 
-                sbBox.setPointerCapture(e.pointerId); 
-                handleSB(e); 
-                sbBox.onpointermove = handleSB; 
-            };
-            sbBox.onpointerup = (e) => { 
-                sbBox.onpointermove = null; 
-                if(!this.recentColors.includes(this.settings.color)) {
-                   this.recentColors.unshift(this.settings.color);
-                   if(this.recentColors.length > 7) this.recentColors.pop();
-                   renderSwatches();
-                }
-            };
+            // Move Cursors
+            const hueX = (this.colorState.h / 360) * 220;
+            const sbX = this.colorState.s * 220;
+            const sbY = (1 - this.colorState.v) * 220;
             
-            const hueRail = document.getElementById('cs-hue-rail');
-            hueRail.onpointerdown = (e) => { hueRail.setPointerCapture(e.pointerId); handleHue(e); hueRail.onpointermove = handleHue; };
-            hueRail.onpointerup = () => { hueRail.onpointermove = null; };
+            document.getElementById('cs-hue-thumb').style.left = hueX + 'px';
+            document.getElementById('cs-sb-cursor').style.left = sbX + 'px';
+            document.getElementById('cs-sb-cursor').style.top = sbY + 'px';
             
-            const hexInput = document.getElementById('cs-hex-input');
-            hexInput.onchange = (e) => { this.setColor(e.target.value, true); updateUI(); };
-
-            renderSwatches();
+            const hex = this.hsvToHex(this.colorState.h, this.colorState.s, this.colorState.v);
+            document.getElementById('cs-preview').style.background = hex;
+            document.getElementById('cs-hex-input').value = hex;
+            this.setColor(hex);
+        };
+        
+        // Interaction Handlers
+        const handleSB = (e) => {
+            const rect = sbCanvas.getBoundingClientRect();
+            let x = Math.max(0, Math.min(220, e.clientX - rect.left));
+            let y = Math.max(0, Math.min(220, e.clientY - rect.top));
+            this.colorState.s = x / 220;
+            this.colorState.v = 1 - (y / 220);
             updateUI();
-        }, 50);
+        };
+        
+        const handleHue = (e) => {
+            const rect = hueCanvas.getBoundingClientRect();
+            let x = Math.max(0, Math.min(220, e.clientX - rect.left));
+            this.colorState.h = (x / 220) * 360;
+            updateUI();
+        };
+
+        const sbBox = document.getElementById('cs-sb-box');
+        sbBox.onpointerdown = (e) => { sbBox.setPointerCapture(e.pointerId); handleSB(e); sbBox.onpointermove = handleSB; };
+        sbBox.onpointerup = () => { sbBox.onpointermove = null; };
+        
+        const hueRail = document.getElementById('cs-hue-rail');
+        hueRail.onpointerdown = (e) => { hueRail.setPointerCapture(e.pointerId); handleHue(e); hueRail.onpointermove = handleHue; };
+        hueRail.onpointerup = () => { hueRail.onpointermove = null; };
+        
+        document.getElementById('cs-hex-input').onchange = (e) => {
+            this.setColor(e.target.value); updateUI(); 
+        };
+
+        updateUI();
     }
+
 
     hsvToHex(h, s, v) {
         let r, g, b, i, f, p, q, t;
@@ -778,56 +810,6 @@ setColor(c) {
         }
         const toHex = x => { const val = Math.round(x * 255).toString(16); return val.length === 1 ? '0' + val : val; };
         return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-    }
-
-                // --- TEMPLATE: Helper Functions for Layer UI ---
-
-    createNewLayer() {
-        const newLayer = this.layerManager.addLayer(`Layer ${this.layerManager.layers.length + 1}`);
-        this.layerManager.setActive(newLayer.id);
-        this.refreshUI();
-        this.showToast("Layer Added 📄");
-    }
-
-    deleteLayer(id) {
-        if (this.layerManager.layers.length <= 1) {
-            this.showToast("Cannot delete last layer!");
-            return;
-        }
-        const index = this.layerManager.layers.findIndex(l => l.id === id);
-        if (index > -1) {
-            this.layerManager.layers.splice(index, 1);
-            if (this.layerManager.activeId === id) {
-                this.layerManager.activeId = this.layerManager.layers[0].id;
-            }
-            this.sound.play('trash');
-            this.refreshUI(); 
-            this.requestRender(); 
-        }
-    }
-
-    setLayerOpacity(id, val) {
-    const layer = this.layerManager.layers.find(l => l.id === id);
-    if (layer) {
-        layer.opacity = parseInt(val) / 100;
-        this.requestRender(); 
-     const textSpan = document.querySelector(`input[oninput*="${id}"]`).nextElementSibling;
-        if(textSpan) textSpan.textContent = Math.round(layer.opacity * 100) + '%';
-    }
-    }
-
-    setLayerActive(id) {
-        this.layerManager.setActive(id);
-        this.refreshUI();
-    }
-
-    toggleLayerVis(id) {
-        const layer = this.layerManager.layers.find(l => l.id === id);
-        if (layer) {
-            layer.visible = !layer.visible;
-            this.requestRender();
-            this.refreshUI();
-        }
     }
 }
 window.app = new ProSketch();
