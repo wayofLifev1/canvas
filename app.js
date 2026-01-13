@@ -271,14 +271,25 @@ class ProSketch {
         d.push("Z"); return d.join(" ");
     }
 
-    commitStroke() {
-        const layer = this.layerManager.getActive();
-        if (!layer || !layer.visible) return;
-        if (this.settings.tool === 'scissor') { this.performScissorCut(layer, this.points); return; }
+        commitStroke() {
+        // 1. Try to get the active layer
+        let layer = this.layerManager.getActive();
+        if (!layer || !layer.visible) {
+            const firstVisible = this.layerManager.layers.find(l => l.visible);
+            if (firstVisible) {
+                this.layerManager.setActive(firstVisible.id);
+                layer = firstVisible;
+                this.showToast("Layer Auto-Selected 📄");
+            } else {
+                this.showToast("No Visible Layers! 🚫");
+                return;
+            }
+        }
+        
+            if (this.settings.tool === 'scissor') { this.performScissorCut(layer, this.points); return; }
 
         const toolCfg = this.tools[this.settings.tool];
-        
-        if (toolCfg.type === 'shape') {
+           if (toolCfg.type === 'shape') {
              if (this.points.length >= 2) {
                  this.drawGeometricShape(layer.ctx, this.points[0], this.points[1], toolCfg.shape, this.settings.color, this.settings.size, this.settings.opacity);
                  this.history.push({ 
@@ -635,7 +646,9 @@ class ProSketch {
     }
     loadTemplate(type) {
         this.toggleTemplateModal(false);
-        const guideLayer = this.layerManager.addLayer('Guide'); const ctx = guideLayer.ctx;
+        const guideLayer = this.layerManager.addLayer('Guide'); 
+        this.layerManager.setActive(guideLayer.id);
+        const ctx = guideLayer.ctx;
         const w = this.width; const h = this.height; const cx = w / 2; const cy = h / 2;
         ctx.lineCap = 'round'; ctx.lineJoin = 'round'; const isColoring = type.startsWith('color');
         if (isColoring) { ctx.strokeStyle = '#000000'; ctx.lineWidth = 15; ctx.setLineDash([]); } else { ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 10; ctx.setLineDash([25, 30]); }
@@ -653,6 +666,8 @@ class ProSketch {
             const img = new Image(); 
             img.onload = () => { 
                 const newLayer = this.layerManager.addLayer('Imported Image'); 
+                this.layerManager.setActive(newLayer.id); 
+                const scale = Math.min(this.width / img.width, this.height / img.height); 
                 const scale = Math.min(this.width / img.width, this.height / img.height); 
                 const w = img.width * scale; const h = img.height * scale; 
                 const x = (this.width - w) / 2; const y = (this.height - h) / 2; 
