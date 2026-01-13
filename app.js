@@ -566,97 +566,57 @@ setColor(c) {
         this.ctx.globalAlpha = 1; this.ctx.globalCompositeOperation = 'source-over'; 
     }
     
-    toggleProps(mode) {
-        const p = document.getElementById('main-panel');
-        if (!mode || (this.currentPanel === mode && p.classList.contains('active'))) { p.classList.remove('active'); this.currentPanel = null; return; }
-        this.currentPanel = mode; p.classList.add('active');
-        document.getElementById('panel-title').textContent = mode === 'layers' ? 'My Pages' : 'Studio Options';
+        toggleProps(mode) {
+        // 1. Try to find the panel
+        let p = document.getElementById('main-panel');
+        
+        // 2. AUTO-FIX: Create panel if missing (Fixes Layer Button Crash)
+        if (!p) {
+            p = document.createElement('div');
+            p.id = 'main-panel';
+            p.className = 'side-panel';
+            p.innerHTML = `
+                <div class="panel-header">
+                    <span id="panel-title">Options</span>
+                    <span onclick="app.toggleProps(null)" style="cursor:pointer;">&times;</span>
+                </div>
+                <div id="panel-content"></div>
+            `;
+            document.body.appendChild(p);
+            
+            // Add CSS for the panel if it's missing
+            if (!document.getElementById('panel-styles')) {
+                const style = document.createElement('style');
+                style.id = 'panel-styles';
+                style.innerHTML = `
+                    .side-panel { position:fixed; bottom:-100%; left:0; width:100%; background:white; border-radius:20px 20px 0 0; padding:20px; transition:bottom 0.3s; box-shadow:0 -5px 20px rgba(0,0,0,0.1); z-index:1000; box-sizing:border-box; }
+                    .side-panel.active { bottom:0; }
+                    .panel-header { display:flex; justify-content:space-between; font-weight:bold; margin-bottom:15px; font-size:18px; }
+                `;
+                document.head.appendChild(style);
+            }
+        }
+
+        // 3. Normal Toggle Logic
+        if (!mode || (this.currentPanel === mode && p.classList.contains('active'))) { 
+            p.classList.remove('active'); 
+            this.currentPanel = null; 
+            return; 
+        }
+        
+        this.currentPanel = mode; 
+        p.classList.add('active');
+        
+        const titleEl = document.getElementById('panel-title');
+        if(titleEl) titleEl.textContent = mode === 'layers' ? 'My Pages' : 'Studio Options';
+        
         this.refreshUI();
     }
 
-    fullReset() {
-        this.layerManager.init(2400, 1800);
-        this.history = []; this.redoStack = []; this.points = [];
-        this.requestRender();
-    }
-
-    refreshUI() {
-        const content = document.getElementById('panel-content');
-        if (!content || !this.currentPanel) return;
-
-        if (this.currentPanel === 'layers') {
-            const layersHTML = this.layerManager.layers.slice().reverse().map(layer => {
-                const isActive = layer.id === this.layerManager.activeId ? 'active' : '';
-                const canDelete = this.layerManager.layers.length > 1;
-                
-                return `
-                <div class="layer-item ${isActive}" style="display:flex; flex-direction:column; gap:5px; padding:10px; border:2px solid ${isActive ? '#6366f1' : '#f1f5f9'}; border-radius:12px; margin-bottom:8px; background:white;">
-                    
-                    <div style="display:flex; align-items:center; justify-content:space-between; width:100%; gap: 10px;">
-                        <div onclick="app.toggleLayerVis('${layer.id}')" style="cursor:pointer; font-size:18px; width:30px; display:flex; align-items:center; justify-content:center;">
-                            ${layer.visible ? '👁️' : '🔒'}
-                        </div>
-                        
-                        <div onclick="app.setLayerActive('${layer.id}')" style="flex:1; font-weight:bold; cursor:pointer; color:#334155; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                            ${layer.name}
-                        </div>
-
-                        <div onclick="${canDelete ? `app.deleteLayer('${layer.id}')` : ''}" 
-                             style="cursor:${canDelete ? 'pointer' : 'not-allowed'}; color:${canDelete ? '#ef4444' : '#cbd5e1'}; font-size:18px; padding:5px; flex-shrink:0; width:30px; text-align:center;">
-                            🗑️
-                        </div>
-                    </div>
-
-                    <div style="display:flex; align-items:center; gap:10px; margin-top:5px;">
-                        <span style="font-size:10px; font-weight:bold; color:#94a3b8;">OPACITY</span>
-                        <input type="range" min="0" max="100" value="${layer.opacity * 100}" 
-                            oninput="app.setLayerOpacity('${layer.id}', this.value)" 
-                            onpointerdown="event.stopPropagation()"
-                            style="flex:1; height:4px; accent-color:#6366f1;">
-                        <span style="font-size:10px; color:#64748b; width:25px; text-align:right;">${Math.round(layer.opacity * 100)}%</span>
-                    </div>
-                </div>`;
-            }).join('');
-
-            content.innerHTML = layersHTML + `
-                <div onclick="app.createNewLayer()" class="layer-item" style="justify-content:center; border:2px dashed #cbd5e1; color:#64748b; cursor:pointer; margin-top:10px; padding:10px; text-align:center; border-radius:12px;">
-                    + New Layer
-                </div>
-            `;
-
-        } else if (this.currentPanel === 'settings') {
-            content.innerHTML = `
-                <div style="margin-bottom:20px;">
-                     <div style="font-size:14px; font-weight:600; color:#888;">FILTERS 🪄</div>
-                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;">
-                        <button onclick="app.triggerFilter('grayscale')" class="btn-filter">BW</button>
-                        <button onclick="app.triggerFilter('sepia')" class="btn-filter">Sepia</button>
-                        <button onclick="app.triggerFilter('invert')" class="btn-filter">Invert</button>
-                     </div>
-                </div>
-                <div class="layer-item" onclick="app.resetView()" style="font-weight:bold; color:#6366f1; cursor:pointer; padding:10px;">🔍 Fit to Screen</div>
-                <div class="layer-item" onclick="app.fullReset()" style="color:#ef4444; font-weight:bold; cursor:pointer; padding:10px;">🗑️ Clear All</div>
-            `;
-        }
-    }
-
-    applyFilter(type, layer, isReplay=false) {
-        const imgData = layer.ctx.getImageData(0,0, this.width, this.height); const data = imgData.data;
-        for(let i=0; i<data.length; i+=4) {
-            const r = data[i], g = data[i+1], b = data[i+2];
-            if (type === 'grayscale') { const v = 0.3*r + 0.59*g + 0.11*b; data[i]=data[i+1]=data[i+2]=v; }
-            else if (type === 'invert') { data[i]=255-r; data[i+1]=255-g; data[i+2]=255-b; }
-            else if (type === 'sepia') { data[i] = (r * .393) + (g *.769) + (b * .189); data[i+1] = (r * .349) + (g *.686) + (b * .168); data[i+2] = (r * .272) + (g *.534) + (b * .131); }
-        }
-        layer.ctx.putImageData(imgData, 0, 0);
-    }
-
-    toggleGalleryModal(show) { document.getElementById('gallery-modal').style.display = show ? 'flex' : 'none'; if(show) this.refreshGalleryModal(); }
-    toggleTemplateModal(show) { document.getElementById('template-modal').style.display = show === false ? 'none' : 'flex'; }
-  toggleColorStudio(show) { 
+    toggleColorStudio(show) { 
         let modal = document.getElementById('color-studio-modal');
         
-        // AUTO-FIX: Create the modal if it is missing from HTML
+        // AUTO-FIX: Create modal if missing (Fixes Color Button doing nothing)
         if (!modal) {
             modal = document.createElement('div');
             modal.id = 'color-studio-modal';
@@ -666,7 +626,7 @@ setColor(c) {
         
         modal.style.display = show ? 'flex' : 'none'; 
         
-        // Only init canvas if it doesn't exist yet
+        // Only init canvas if showing and not already drawn
         if(show && !document.getElementById('cs-sb-canvas')) {
             this.initColorStudio(); 
         }
@@ -674,7 +634,8 @@ setColor(c) {
 
     initColorStudio() {
         const modal = document.getElementById('color-studio-modal');
-        // 1. Inject HTML
+        if (!modal) return;
+
         modal.innerHTML = `
             <div style="pointer-events: auto; background:white; padding:20px; border-radius:24px; box-shadow:0 10px 40px rgba(0,0,0,0.2); width:320px; display:flex; flex-direction:column; align-items:center;">
                 <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
@@ -687,10 +648,12 @@ setColor(c) {
                         <canvas id="cs-sb-canvas" width="220" height="220" style="width:220px; height:220px; display:block;"></canvas>
                         <div id="cs-sb-cursor" class="cs-cursor"></div>
                     </div>
+                    
                     <div class="cs-hue-wrapper" id="cs-hue-rail">
                         <canvas id="cs-hue-canvas" width="220" height="30" style="width:220px; height:30px; display:block; border-radius:15px;"></canvas>
                         <div id="cs-hue-thumb" class="cs-slider-thumb"></div>
                     </div>
+                    
                     <div class="cs-hex-row">
                         <div id="cs-preview" style="width:40px; height:40px; border-radius:10px; background:${this.settings.color}; box-shadow:inset 0 0 0 1px rgba(0,0,0,0.1);"></div>
                         <div style="display:flex; flex-direction:column; gap:2px;">
@@ -699,12 +662,13 @@ setColor(c) {
                         </div>
                         <button onclick="app.toggleColorStudio(false)" style="background:#6366f1; color:white; border:none; padding:8px 16px; border-radius:8px; font-weight:bold; cursor:pointer;">Done</button>
                     </div>
+
                     <div class="cs-swatch-grid" id="cs-recent-grid"></div>
                 </div>
             </div>
         `;
 
-        // 2. Run Drawing Logic (This fixes the Blank White issue)
+        // Wait for DOM then draw
         setTimeout(() => { 
             const sbCanvas = document.getElementById('cs-sb-canvas');
             const hueCanvas = document.getElementById('cs-hue-canvas');
@@ -713,7 +677,6 @@ setColor(c) {
             const sbCtx = sbCanvas.getContext('2d');
             const hueCtx = hueCanvas.getContext('2d');
 
-            // Draw Static Hue Rail
             const hueGrad = hueCtx.createLinearGradient(0, 0, hueCanvas.width, 0);
             for(let i=0; i<=360; i+=60) hueGrad.addColorStop(i/360, `hsl(${i}, 100%, 50%)`);
             hueCtx.fillStyle = hueGrad; 
@@ -725,7 +688,6 @@ setColor(c) {
             };
 
             const updateUI = () => {
-                // Draw Saturation/Brightness Box
                 sbCtx.clearRect(0,0,220,220);
                 sbCtx.fillStyle = `hsl(${this.colorState.h}, 100%, 50%)`;
                 sbCtx.fillRect(0, 0, 220, 220);
@@ -738,19 +700,20 @@ setColor(c) {
                 blackGrad.addColorStop(0, 'transparent'); blackGrad.addColorStop(1, 'black');
                 sbCtx.fillStyle = blackGrad; sbCtx.fillRect(0,0,220,220);
                 
-                // Position Cursors
                 const hueX = Math.min(220, Math.max(0, (this.colorState.h / 360) * 220));
                 const sbX = Math.min(220, Math.max(0, this.colorState.s * 220));
                 const sbY = Math.min(220, Math.max(0, (1 - this.colorState.v) * 220));
                 
                 const hueThumb = document.getElementById('cs-hue-thumb');
                 const sbCursor = document.getElementById('cs-sb-cursor');
+                
                 if(hueThumb) hueThumb.style.left = hueX + 'px';
                 if(sbCursor) { sbCursor.style.left = sbX + 'px'; sbCursor.style.top = sbY + 'px'; }
                 
                 const hex = this.hsvToHex(this.colorState.h, this.colorState.s, this.colorState.v);
                 const preview = document.getElementById('cs-preview');
                 const input = document.getElementById('cs-hex-input');
+                
                 if(preview) preview.style.background = hex;
                 if(input && document.activeElement !== input) input.value = hex;
                 
