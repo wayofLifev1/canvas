@@ -655,102 +655,167 @@ setColor(c) {
     toggleTemplateModal(show) { document.getElementById('template-modal').style.display = show === false ? 'none' : 'flex'; }
     toggleColorStudio(show) { 
         const modal = document.getElementById('color-studio-modal');
-        if (!modal) return;
+        if (!modal) return; // Safety check
+        
         modal.style.display = show ? 'flex' : 'none'; 
         
-        // Only initialize the canvas if we are showing it and it hasn't been drawn yet
+        // Only run initialization if we haven't created the canvas yet
         if(show && !document.getElementById('cs-sb-canvas')) {
             this.initColorStudio(); 
         }
     }
-    bindShortcuts() {
-        window.addEventListener('keydown', (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); e.shiftKey ? this.redo() : this.undo(); }
-            if (e.key === '[') { this.updateSettings('size', Math.max(1, this.settings.size - 2)); this.showToast(`Size: ${this.settings.size}`); }
-            if (e.key === ']') { this.updateSettings('size', Math.min(100, this.settings.size + 2)); this.showToast(`Size: ${this.settings.size}`); }
-        });
-    }
 
-    saveToGallery() {
-        try {
-            const thumbCanvas = document.createElement('canvas'); const w = 300, h = 225; thumbCanvas.width = w; thumbCanvas.height = h;
-            const tCtx = thumbCanvas.getContext('2d'); tCtx.fillStyle = '#ffffff'; tCtx.fillRect(0, 0, w, h); tCtx.drawImage(this.canvas, 0, 0, w, h);
-            const thumbData = thumbCanvas.toDataURL('image/jpeg', 0.8);
+    initColorStudio() {
+        const modal = document.getElementById('color-studio-modal');
+        modal.className = 'cs-modal-overlay';
+        
+        // 1. Inject the HTML Structure
+        modal.innerHTML = `
+            <div style="pointer-events: auto; background:white; padding:20px; border-radius:24px; box-shadow:0 10px 40px rgba(0,0,0,0.2); width:320px; display:flex; flex-direction:column; align-items:center;">
+                <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                    <h3 style="margin:0; font-size:18px; color:#333;">Color Studio 🎨</h3>
+                    <button onclick="app.toggleColorStudio(false)" style="background:none; border:none; font-size:24px; cursor:pointer; color:#666;">&times;</button>
+                </div>
+                
+                <div class="cs-container">
+                    <div class="cs-sb-wrapper" id="cs-sb-box">
+                        <canvas id="cs-sb-canvas" width="220" height="220" style="width:220px; height:220px; display:block;"></canvas>
+                        <div id="cs-sb-cursor" class="cs-cursor"></div>
+                    </div>
+                    
+                    <div class="cs-hue-wrapper" id="cs-hue-rail">
+                        <canvas id="cs-hue-canvas" width="220" height="30" style="width:220px; height:30px; display:block; border-radius:15px;"></canvas>
+                        <div id="cs-hue-thumb" class="cs-slider-thumb"></div>
+                    </div>
+                    
+                    <div class="cs-hex-row">
+                        <div id="cs-preview" style="width:40px; height:40px; border-radius:10px; background:${this.settings.color}; box-shadow:inset 0 0 0 1px rgba(0,0,0,0.1);"></div>
+                        <div style="display:flex; flex-direction:column; gap:2px;">
+                            <span style="font-size:10px; color:#888; font-weight:600;">HEX CODE</span>
+                            <input id="cs-hex-input" class="cs-hex-input" value="${this.settings.color}" maxlength="7" spellcheck="false">
+                        </div>
+                        <button onclick="app.toggleColorStudio(false)" style="background:#6366f1; color:white; border:none; padding:8px 16px; border-radius:8px; font-weight:bold; cursor:pointer;">Done</button>
+                    </div>
+
+                    <div class="cs-swatch-grid" id="cs-recent-grid"></div>
+                </div>
+            </div>
+        `;
+
+        // 2. Run the Drawing Logic (The part that was missing!)
+        setTimeout(() => { 
+            const sbCanvas = document.getElementById('cs-sb-canvas');
+            const hueCanvas = document.getElementById('cs-hue-canvas');
+            if(!sbCanvas || !hueCanvas) return;
+
+            const sbCtx = sbCanvas.getContext('2d');
+            const hueCtx = hueCanvas.getContext('2d');
+
+            // Draw Static Hue Rail
+            const hueGrad = hueCtx.createLinearGradient(0, 0, hueCanvas.width, 0);
+            for(let i=0; i<=360; i+=60) hueGrad.addColorStop(i/360, `hsl(${i}, 100%, 50%)`);
+            hueCtx.fillStyle = hueGrad; 
+            hueCtx.fillRect(0,0, hueCanvas.width, hueCanvas.height);
+
+            const renderSwatches = () => {
+                const grid = document.getElementById('cs-recent-grid');
+                if(grid) grid.innerHTML = this.recentColors.map(c => `<div class="cs-swatch" style="background:${c}" onclick="app.setColor('${c}', false); app.toggleColorStudio(false);"></div>`).join('');
+            };
+
+            const updateUI = () => {
+                // Draw Saturation/Brightness Box
+                sbCtx.clearRect(0,0,220,220);
+                sbCtx.fillStyle = `hsl(${this.colorState.h}, 100%, 50%)`;
+                sbCtx.fillRect(0, 0, 220, 220);
+                
+                const whiteGrad = sbCtx.createLinearGradient(0,0,220,0);
+                whiteGrad.addColorStop(0, 'white'); whiteGrad.addColorStop(1, 'rgba(255,255,255,0)');
+                sbCtx.fillStyle = whiteGrad; sbCtx.fillRect(0,0,220,220);
+                
+                const blackGrad = sbCtx.createLinearGradient(0,0,0,220);
+                blackGrad.addColorStop(0, 'transparent'); blackGrad.addColorStop(1, 'black');
+                sbCtx.fillStyle = blackGrad; sbCtx.fillRect(0,0,220,220);
+                
+                // Position Cursors
+                const hueX = Math.min(220, Math.max(0, (this.colorState.h / 360) * 220));
+                const sbX = Math.min(220, Math.max(0, this.colorState.s * 220));
+                const sbY = Math.min(220, Math.max(0, (1 - this.colorState.v) * 220));
+                
+                const hueThumb = document.getElementById('cs-hue-thumb');
+                const sbCursor = document.getElementById('cs-sb-cursor');
+                
+                if(hueThumb) hueThumb.style.left = hueX + 'px';
+                if(sbCursor) { sbCursor.style.left = sbX + 'px'; sbCursor.style.top = sbY + 'px'; }
+                
+                const hex = this.hsvToHex(this.colorState.h, this.colorState.s, this.colorState.v);
+                const preview = document.getElementById('cs-preview');
+                const input = document.getElementById('cs-hex-input');
+                
+                if(preview) preview.style.background = hex;
+                if(input && document.activeElement !== input) input.value = hex;
+                
+                this.setColor(hex, false); 
+            };
+
+            // Event Handlers
+            const handleSB = (e) => {
+                const rect = sbCanvas.getBoundingClientRect();
+                let x = Math.max(0, Math.min(220, e.clientX - rect.left));
+                let y = Math.max(0, Math.min(220, e.clientY - rect.top));
+                this.colorState.s = x / 220;
+                this.colorState.v = 1 - (y / 220);
+                updateUI();
+            };
             
-            const workCanvas = document.createElement('canvas'); const scale = Math.min(800 / this.width, 800 / this.height);
-            workCanvas.width = this.width * scale; workCanvas.height = this.height * scale;
-            const wCtx = workCanvas.getContext('2d'); wCtx.fillStyle = '#ffffff'; wCtx.fillRect(0, 0, workCanvas.width, workCanvas.height); wCtx.drawImage(this.canvas, 0, 0, workCanvas.width, workCanvas.height);
-            const fullData = workCanvas.toDataURL('image/jpeg', 0.8);
+            const handleHue = (e) => {
+                const rect = hueCanvas.getBoundingClientRect();
+                let x = Math.max(0, Math.min(220, e.clientX - rect.left));
+                this.colorState.h = (x / 220) * 360;
+                updateUI();
+            };
 
-            const artItem = { id: Date.now(), date: new Date().toLocaleDateString(), thumb: thumbData, full: fullData };
-            this.gallery.unshift(artItem); if(this.gallery.length > 6) this.gallery.pop();
-            localStorage.setItem('prosketch-gallery', JSON.stringify(this.gallery)); this.showToast('Saved to Gallery! 📸'); 
-            this.sound.play('pop'); 
-            this.refreshGalleryModal();
-        } catch(e) { this.showToast('Storage Full! 📂'); }
+            const sbBox = document.getElementById('cs-sb-box');
+            sbBox.onpointerdown = (e) => { 
+                sbBox.setPointerCapture(e.pointerId); 
+                handleSB(e); 
+                sbBox.onpointermove = handleSB; 
+            };
+            sbBox.onpointerup = (e) => { 
+                sbBox.onpointermove = null; 
+                if(!this.recentColors.includes(this.settings.color)) {
+                   this.recentColors.unshift(this.settings.color);
+                   if(this.recentColors.length > 7) this.recentColors.pop();
+                   renderSwatches();
+                }
+            };
+            
+            const hueRail = document.getElementById('cs-hue-rail');
+            hueRail.onpointerdown = (e) => { hueRail.setPointerCapture(e.pointerId); handleHue(e); hueRail.onpointermove = handleHue; };
+            hueRail.onpointerup = () => { hueRail.onpointermove = null; };
+            
+            const hexInput = document.getElementById('cs-hex-input');
+            hexInput.onchange = (e) => { this.setColor(e.target.value, true); updateUI(); };
+
+            renderSwatches();
+            updateUI();
+        }, 50);
     }
-    loadGallery() { try { const g = localStorage.getItem('prosketch-gallery'); if(g) this.gallery = JSON.parse(g); } catch(e) {} }
-    deleteFromGallery(id) { 
-        this.gallery = this.gallery.filter(item => item.id !== id); 
-        localStorage.setItem('prosketch-gallery', JSON.stringify(this.gallery)); 
-        this.sound.play('trash'); 
-        this.refreshGalleryModal(); 
+
+    hsvToHex(h, s, v) {
+        let r, g, b, i, f, p, q, t;
+        h = h / 360; i = Math.floor(h * 6); f = h * 6 - i;
+        p = v * (1 - s); q = v * (1 - f * s); t = v * (1 - (1 - f) * s);
+        switch (i % 6) {
+            case 0: r = v; g = t; b = p; break;
+            case 1: r = q; g = v; b = p; break;
+            case 2: r = p; g = v; b = t; break;
+            case 3: r = p; g = q; b = v; break;
+            case 4: r = t; g = p; b = v; break;
+            case 5: r = v; g = p; b = q; break;
+        }
+        const toHex = x => { const val = Math.round(x * 255).toString(16); return val.length === 1 ? '0' + val : val; };
+        return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
     }
-    loadFromGallery(id) {
-        const item = this.gallery.find(x => x.id === id); if (!item) return; this.showToast("Loading Art... ⏳");
-        const img = new Image(); img.onload = () => { const newLayer = this.layerManager.addLayer('Loaded Art'); newLayer.ctx.drawImage(img, 0, 0, this.width, this.height); this.requestRender(); this.toggleGalleryModal(false); this.showToast('Art Loaded! 🎨'); };
-        img.src = item.full || item.thumb;
-    }
-    downloadFromGallery(id) {
-        const item = this.gallery.find(x => x.id === id); if (!item) return;
-        const link = document.createElement('a'); link.download = `Art-${id}.jpg`; link.href = item.full || item.thumb; 
-        document.body.appendChild(link); link.click(); document.body.removeChild(link);
-    }
-    refreshGalleryModal() {
-        const grid = document.getElementById('gallery-grid'); if (!grid) return;
-        if (this.gallery.length === 0) { grid.innerHTML = `<div style="text-align:center; color:#999; grid-column:1/-1;">No saved art yet! 🎨</div>`; return; }
-        grid.innerHTML = this.gallery.map(item => `
-            <div class="gallery-card"><img src="${item.thumb}" onclick="app.loadFromGallery(${item.id})"><div class="gallery-actions"><span>${item.date}</span><div style="display:flex; gap:10px;"><span onclick="app.downloadFromGallery(${item.id})" style="color:#6366f1; cursor:pointer;" title="Download PNG">⬇️</span><span onclick="app.deleteFromGallery(${item.id})" style="color:#ef4444; cursor:pointer;" title="Delete">🗑️</span></div></div></div>`).join('');
-    }
-    loadTemplate(type) {
-        this.toggleTemplateModal(false);
-        const guideLayer = this.layerManager.addLayer('Guide'); 
-        this.layerManager.setActive(guideLayer.id);
-        const ctx = guideLayer.ctx;
-        const w = this.width; const h = this.height; const cx = w / 2; const cy = h / 2;
-        ctx.lineCap = 'round'; ctx.lineJoin = 'round'; const isColoring = type.startsWith('color');
-        if (isColoring) { ctx.strokeStyle = '#000000'; ctx.lineWidth = 15; ctx.setLineDash([]); } else { ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 10; ctx.setLineDash([25, 30]); }
-        ctx.beginPath();
-        if (type === 'line-h') { for(let i=1; i<5; i++) { const y = (h/5)*i; ctx.moveTo(200, y); ctx.lineTo(w-200, y); } } 
-        else if (type === 'line-z') { const step = 200; ctx.moveTo(100, cy); for(let x=100; x<w-100; x+=step) { ctx.lineTo(x + step/2, cy - 300); ctx.lineTo(x + step, cy + 300); } }
-        else if (type === 'shape-circle') { ctx.arc(cx, cy, 500, 0, Math.PI*2); }
-        else if (type === 'color-sun') { ctx.arc(cx, cy, 250, 0, Math.PI*2); for(let i=0; i<8; i++) { const angle = (i * 45) * Math.PI / 180; ctx.moveTo(cx + Math.cos(angle)*300, cy + Math.sin(angle)*300); ctx.lineTo(cx + Math.cos(angle)*500, cy + Math.sin(angle)*500); } }
-        ctx.stroke(); this.requestRender(); this.showToast(isColoring ? "Ready to Color! 🖍️" : "Trace the lines! ✏️");
-        if (!isColoring) { const drawLayer = this.layerManager.addLayer('Practice Layer'); this.layerManager.setActive(drawLayer.id); guideLayer.opacity = 0.6; } 
-    }
-        handleUpload(input) {
-        const file = input.files[0]; if (!file) return; const reader = new FileReader();
-        reader.onload = (e) => { 
-            const img = new Image(); 
-            img.onload = () => { 
-                const newLayer = this.layerManager.addLayer('Imported Image'); 
-                this.layerManager.setActive(newLayer.id); 
-                
-                // FIXED: Removed duplicate 'const scale' line
-                const scale = Math.min(this.width / img.width, this.height / img.height); 
-                
-                const w = img.width * scale; const h = img.height * scale; 
-                const x = (this.width - w) / 2; const y = (this.height - h) / 2; 
-                newLayer.ctx.drawImage(img, x, y, w, h); 
-                this.history.push({ type: 'image', layerId: newLayer.id, img: img, x:x, y:y, w:w, h:h });
-                this.redoStack = [];
-                this.requestRender(); this.showToast('Image Imported! 📷'); input.value = ''; 
-            }; 
-            img.src = e.target.result; 
-        }; 
-        reader.readAsDataURL(file);
-    }
-    
         clearLayer() { 
         const layer = this.layerManager.getActive(); 
         if(layer) { 
