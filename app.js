@@ -423,17 +423,20 @@ class ProSketch {
     }
     
     injectColorStyles() {
+    injectColorStyles() {
         if(document.getElementById('cs-styles')) return;
         const css = `
-        .cs-container { display:flex; flex-direction:column; align-items:center; gap:15px; width:100%; padding:10px; }
-        .cs-sb-wrapper { position:relative; width:220px; height:220px; border-radius:12px; overflow:hidden; box-shadow:0 4px 10px rgba(0,0,0,0.1); touch-action:none; }
-        .cs-hue-wrapper { position:relative; width:220px; height:30px; border-radius:15px; margin-top:5px; touch-action:none; }
-        .cs-cursor { position:absolute; width:14px; height:14px; border:2px solid white; border-radius:50%; box-shadow:0 0 2px rgba(0,0,0,0.5); transform:translate(-50%, -50%); pointer-events:none; }
-        .cs-slider-thumb { position:absolute; top:50%; width:14px; height:24px; background:white; border-radius:8px; border:1px solid #ccc; box-shadow:0 2px 4px rgba(0,0,0,0.2); transform:translate(-50%, -50%); pointer-events:none; }
-        .cs-hex-row { display:flex; gap:10px; align-items:center; width:220px; justify-content:space-between; }
-        .cs-hex-input { background:#f3f4f6; border:none; padding:8px 12px; border-radius:8px; font-family:monospace; font-size:14px; color:#444; width:100px; text-align:center; }
-        .cs-swatch-grid { display:flex; gap:8px; width:220px; flex-wrap:wrap; margin-top:5px; }
-        .cs-swatch { width:30px; height:30px; border-radius:50%; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.1); cursor:pointer; }
+        .cs-modal-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; display:none; justify-content:center; align-items:center; backdrop-filter:blur(2px); }
+        .cs-container { display:flex; flex-direction:column; align-items:center; gap:15px; width:100%; padding:5px; }
+        .cs-sb-wrapper { position:relative; width:220px; height:220px; border-radius:12px; overflow:hidden; box-shadow:0 4px 10px rgba(0,0,0,0.1); touch-action:none; background: #fff; cursor: crosshair; }
+        .cs-hue-wrapper { position:relative; width:220px; height:30px; border-radius:15px; margin-top:5px; touch-action:none; cursor: ew-resize; }
+        .cs-cursor { position:absolute; width:16px; height:16px; border:2px solid white; border-radius:50%; box-shadow:0 0 3px rgba(0,0,0,0.5); transform:translate(-50%, -50%); pointer-events:none; z-index: 10; }
+        .cs-slider-thumb { position:absolute; top:50%; width:16px; height:24px; background:white; border-radius:8px; border:1px solid #ccc; box-shadow:0 2px 4px rgba(0,0,0,0.2); transform:translate(-50%, -50%); pointer-events:none; z-index: 10; }
+        .cs-hex-row { display:flex; gap:10px; align-items:center; width:220px; justify-content:space-between; margin-top: 5px; }
+        .cs-hex-input { background:#f3f4f6; border:1px solid #e5e7eb; padding:8px 12px; border-radius:8px; font-family:monospace; font-size:14px; color:#444; width:100px; text-align:center; }
+        .cs-swatch-grid { display:flex; gap:8px; width:220px; flex-wrap:wrap; margin-top:10px; min-height: 30px;}
+        .cs-swatch { width:30px; height:30px; border-radius:50%; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.1); cursor:pointer; transition: transform 0.1s; }
+        .cs-swatch:active { transform: scale(0.9); }
         `;
         const s = document.createElement('style'); s.id = 'cs-styles'; s.innerHTML = css; document.head.appendChild(s);
     }
@@ -576,31 +579,66 @@ setColor(c) {
         this.requestRender();
     }
 
-        refreshUI() {
+            refreshUI() {
         const content = document.getElementById('panel-content');
         if (!content || !this.currentPanel) return;
 
         if (this.currentPanel === 'layers') {
-            // 1. Build Layer List HTML manually to include Opacity & Delete
             const layersHTML = this.layerManager.layers.slice().reverse().map(layer => {
                 const isActive = layer.id === this.layerManager.activeId ? 'active' : '';
+                // Disable delete if it's the only layer
+                const canDelete = this.layerManager.layers.length > 1;
+                
                 return `
-                <div class="layer-item ${isActive}" style="display:flex; flex-direction:column; gap:5px; padding:10px; border:2px solid ${isActive ? '#6366f1' : '#f1f5f9'}; border-radius:12px; margin-bottom:8px;">
+                <div class="layer-item ${isActive}" style="display:flex; flex-direction:column; gap:5px; padding:10px; border:2px solid ${isActive ? '#6366f1' : '#f1f5f9'}; border-radius:12px; margin-bottom:8px; background:white;">
                     
-                    <div style="display:flex; align-items:center; justify-content:space-between; width:100%;">
-                        <div onclick="app.toggleLayerVis('${layer.id}')" style="cursor:pointer; font-size:18px; width:30px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; width:100%; gap: 10px;">
+                        <div onclick="app.toggleLayerVis('${layer.id}')" style="cursor:pointer; font-size:18px; width:30px; display:flex; align-items:center; justify-content:center;">
                             ${layer.visible ? '👁️' : '🔒'}
                         </div>
                         
-                        <div onclick="app.setLayerActive('${layer.id}')" style="flex:1; font-weight:bold; cursor:pointer; color:#334155;">
+                        <div onclick="app.setLayerActive('${layer.id}')" style="flex:1; font-weight:bold; cursor:pointer; color:#334155; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                             ${layer.name}
                         </div>
 
-                        <div onclick="app.deleteLayer('${layer.id}')" style="cursor:pointer; color:#ef4444; font-size:16px; padding:5px;">
+                        <div onclick="${canDelete ? `app.deleteLayer('${layer.id}')` : ''}" 
+                             style="cursor:${canDelete ? 'pointer' : 'not-allowed'}; color:${canDelete ? '#ef4444' : '#cbd5e1'}; font-size:18px; padding:5px; flex-shrink:0; width:30px; text-align:center;">
                             🗑️
                         </div>
                     </div>
 
+                    <div style="display:flex; align-items:center; gap:10px; margin-top:5px;">
+                        <span style="font-size:10px; font-weight:bold; color:#94a3b8;">OPACITY</span>
+                        <input type="range" min="0" max="100" value="${layer.opacity * 100}" 
+                            oninput="app.setLayerOpacity('${layer.id}', this.value)" 
+                            onpointerdown="event.stopPropagation()"
+                            style="flex:1; height:4px; accent-color:#6366f1;">
+                        <span style="font-size:10px; color:#64748b; width:25px; text-align:right;">${Math.round(layer.opacity * 100)}%</span>
+                    </div>
+                </div>`;
+            }).join('');
+
+            content.innerHTML = layersHTML + `
+                <div onclick="app.createNewLayer()" class="layer-item" style="justify-content:center; border:2px dashed #cbd5e1; color:#64748b; cursor:pointer; margin-top:10px; padding:10px; text-align:center; border-radius:12px;">
+                    + New Layer
+                </div>
+            `;
+
+        } else if (this.currentPanel === 'settings') {
+            content.innerHTML = `
+                <div style="margin-bottom:20px;">
+                     <div style="font-size:14px; font-weight:600; color:#888;">FILTERS 🪄</div>
+                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;">
+                        <button onclick="app.triggerFilter('grayscale')" class="btn-filter">BW</button>
+                        <button onclick="app.triggerFilter('sepia')" class="btn-filter">Sepia</button>
+                        <button onclick="app.triggerFilter('invert')" class="btn-filter">Invert</button>
+                     </div>
+                </div>
+                <div class="layer-item" onclick="app.resetView()" style="font-weight:bold; color:#6366f1; cursor:pointer; padding:10px;">🔍 Fit to Screen</div>
+                <div class="layer-item" onclick="app.fullReset()" style="color:#ef4444; font-weight:bold; cursor:pointer; padding:10px;">🗑️ Clear All</div>
+            `;
+        }
+    }
                     <div style="display:flex; align-items:center; gap:10px; margin-top:5px;">
                         <span style="font-size:10px; font-weight:bold; color:#94a3b8;">OPACITY</span>
                         <input type="range" min="0" max="100" value="${layer.opacity * 100}" 
@@ -757,114 +795,157 @@ setColor(c) {
             this.requestRender(); 
         } 
     }
+    injectColorStyles() {
+        if(document.getElementById('cs-styles')) return;
+        const css = `
+        .cs-modal-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; display:none; justify-content:center; align-items:center; backdrop-filter:blur(2px); }
+        .cs-container { display:flex; flex-direction:column; align-items:center; gap:15px; width:100%; padding:5px; }
+        .cs-sb-wrapper { position:relative; width:220px; height:220px; border-radius:12px; overflow:hidden; box-shadow:0 4px 10px rgba(0,0,0,0.1); touch-action:none; background: #fff; cursor: crosshair; }
+        .cs-hue-wrapper { position:relative; width:220px; height:30px; border-radius:15px; margin-top:5px; touch-action:none; cursor: ew-resize; }
+        .cs-cursor { position:absolute; width:16px; height:16px; border:2px solid white; border-radius:50%; box-shadow:0 0 3px rgba(0,0,0,0.5); transform:translate(-50%, -50%); pointer-events:none; z-index: 10; }
+        .cs-slider-thumb { position:absolute; top:50%; width:16px; height:24px; background:white; border-radius:8px; border:1px solid #ccc; box-shadow:0 2px 4px rgba(0,0,0,0.2); transform:translate(-50%, -50%); pointer-events:none; z-index: 10; }
+        .cs-hex-row { display:flex; gap:10px; align-items:center; width:220px; justify-content:space-between; margin-top: 5px; }
+        .cs-hex-input { background:#f3f4f6; border:1px solid #e5e7eb; padding:8px 12px; border-radius:8px; font-family:monospace; font-size:14px; color:#444; width:100px; text-align:center; }
+        .cs-swatch-grid { display:flex; gap:8px; width:220px; flex-wrap:wrap; margin-top:10px; min-height: 30px;}
+        .cs-swatch { width:30px; height:30px; border-radius:50%; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.1); cursor:pointer; transition: transform 0.1s; }
+        .cs-swatch:active { transform: scale(0.9); }
+        `;
+        const s = document.createElement('style'); s.id = 'cs-styles'; s.innerHTML = css; document.head.appendChild(s);
+    }
 
-    // --- MI CANVAS STYLE COLOR STUDIO ---
-        // --- MI CANVAS STYLE COLOR STUDIO ---
     initColorStudio() {
         const modal = document.getElementById('color-studio-modal');
-        // Clear previous content and inject new layout
-        // FIX: Added 'pointer-events: auto' to the main container style below
+        modal.className = 'cs-modal-overlay'; // Ensure class is applied
+        
         modal.innerHTML = `
             <div style="pointer-events: auto; background:white; padding:20px; border-radius:24px; box-shadow:0 10px 40px rgba(0,0,0,0.2); width:320px; display:flex; flex-direction:column; align-items:center;">
-                <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                    <h3 style="margin:0; color:#333;">Color Studio</h3>
-                    <button onclick="app.toggleColorStudio(false)" style="background:none; border:none; font-size:20px; cursor:pointer;">✕</button>
+                <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                    <h3 style="margin:0; font-size:18px; color:#333;">Color Studio 🎨</h3>
+                    <button onclick="app.toggleColorStudio(false)" style="background:none; border:none; font-size:24px; cursor:pointer; color:#666;">&times;</button>
                 </div>
+                
                 <div class="cs-container">
                     <div class="cs-sb-wrapper" id="cs-sb-box">
-                        <canvas id="cs-sb-canvas" width="220" height="220"></canvas>
+                        <canvas id="cs-sb-canvas" width="220" height="220" style="width:220px; height:220px; display:block;"></canvas>
                         <div id="cs-sb-cursor" class="cs-cursor"></div>
                     </div>
+                    
                     <div class="cs-hue-wrapper" id="cs-hue-rail">
-                        <canvas id="cs-hue-canvas" width="220" height="30" style="border-radius:15px;"></canvas>
+                        <canvas id="cs-hue-canvas" width="220" height="30" style="width:220px; height:30px; display:block; border-radius:15px;"></canvas>
                         <div id="cs-hue-thumb" class="cs-slider-thumb"></div>
                     </div>
+                    
                     <div class="cs-hex-row">
-                        <input id="cs-hex-input" class="cs-hex-input" value="${this.settings.color}" maxlength="7" spellcheck="false">
                         <div id="cs-preview" style="width:40px; height:40px; border-radius:10px; background:${this.settings.color}; box-shadow:inset 0 0 0 1px rgba(0,0,0,0.1);"></div>
+                        <div style="display:flex; flex-direction:column; gap:2px;">
+                            <span style="font-size:10px; color:#888; font-weight:600;">HEX CODE</span>
+                            <input id="cs-hex-input" class="cs-hex-input" value="${this.settings.color}" maxlength="7" spellcheck="false">
+                        </div>
+                        <button onclick="app.toggleColorStudio(false)" style="background:#6366f1; color:white; border:none; padding:8px 16px; border-radius:8px; font-weight:bold; cursor:pointer;">Done</button>
                     </div>
+
                     <div class="cs-swatch-grid" id="cs-recent-grid"></div>
                 </div>
             </div>
         `;
-        
-        // ... rest of the function remains the same ...
-        
-        // Setup Logic
-        const sbCanvas = document.getElementById('cs-sb-canvas');
-        const hueCanvas = document.getElementById('cs-hue-canvas');
-        const sbCtx = sbCanvas.getContext('2d');
-        const hueCtx = hueCanvas.getContext('2d');
-        
-        // Draw Hue Rail
-        const hueGrad = hueCtx.createLinearGradient(0, 0, hueCanvas.width, 0);
-        for(let i=0; i<=360; i+=60) hueGrad.addColorStop(i/360, `hsl(${i}, 100%, 50%)`);
-        hueCtx.fillStyle = hueGrad; hueCtx.fillRect(0,0, hueCanvas.width, hueCanvas.height);
-        
-        // Render Swatches
-        const renderSwatches = () => {
-            const grid = document.getElementById('cs-recent-grid');
-            grid.innerHTML = this.recentColors.map(c => `<div class="cs-swatch" style="background:${c}" onclick="app.setColor('${c}'); app.toggleColorStudio(false);"></div>`).join('');
-        };
-        renderSwatches();
 
-        // Update UI Visuals from State
-        const updateUI = () => {
-            // Draw S/B Box
-            sbCtx.fillStyle = `hsl(${this.colorState.h}, 100%, 50%)`;
-            sbCtx.fillRect(0, 0, 220, 220);
-            const whiteGrad = sbCtx.createLinearGradient(0,0,220,0);
-            whiteGrad.addColorStop(0, 'white'); whiteGrad.addColorStop(1, 'rgba(255,255,255,0)');
-            sbCtx.fillStyle = whiteGrad; sbCtx.fillRect(0,0,220,220);
-            const blackGrad = sbCtx.createLinearGradient(0,0,0,220);
-            blackGrad.addColorStop(0, 'transparent'); blackGrad.addColorStop(1, 'black');
-            sbCtx.fillStyle = blackGrad; sbCtx.fillRect(0,0,220,220);
+        // --- DRAWING LOGIC ---
+        setTimeout(() => { // Small delay ensures DOM elements exist
+            const sbCanvas = document.getElementById('cs-sb-canvas');
+            const hueCanvas = document.getElementById('cs-hue-canvas');
+            if(!sbCanvas || !hueCanvas) return;
+
+            const sbCtx = sbCanvas.getContext('2d');
+            const hueCtx = hueCanvas.getContext('2d');
+
+            // 1. Draw Static Hue Rail
+            const hueGrad = hueCtx.createLinearGradient(0, 0, hueCanvas.width, 0);
+            for(let i=0; i<=360; i+=60) hueGrad.addColorStop(i/360, `hsl(${i}, 100%, 50%)`);
+            hueCtx.fillStyle = hueGrad; 
+            hueCtx.fillRect(0,0, hueCanvas.width, hueCanvas.height);
+
+            const renderSwatches = () => {
+                const grid = document.getElementById('cs-recent-grid');
+                if(grid) grid.innerHTML = this.recentColors.map(c => `<div class="cs-swatch" style="background:${c}" onclick="app.setColor('${c}', false); app.toggleColorStudio(false);"></div>`).join('');
+            };
+
+            const updateUI = () => {
+                // Draw S/B Box
+                sbCtx.clearRect(0,0,220,220);
+                sbCtx.fillStyle = `hsl(${this.colorState.h}, 100%, 50%)`;
+                sbCtx.fillRect(0, 0, 220, 220);
+                
+                const whiteGrad = sbCtx.createLinearGradient(0,0,220,0);
+                whiteGrad.addColorStop(0, 'white'); whiteGrad.addColorStop(1, 'rgba(255,255,255,0)');
+                sbCtx.fillStyle = whiteGrad; sbCtx.fillRect(0,0,220,220);
+                
+                const blackGrad = sbCtx.createLinearGradient(0,0,0,220);
+                blackGrad.addColorStop(0, 'transparent'); blackGrad.addColorStop(1, 'black');
+                sbCtx.fillStyle = blackGrad; sbCtx.fillRect(0,0,220,220);
+                
+                // Position Cursors
+                const hueX = Math.min(220, Math.max(0, (this.colorState.h / 360) * 220));
+                const sbX = Math.min(220, Math.max(0, this.colorState.s * 220));
+                const sbY = Math.min(220, Math.max(0, (1 - this.colorState.v) * 220));
+                
+                const hueThumb = document.getElementById('cs-hue-thumb');
+                const sbCursor = document.getElementById('cs-sb-cursor');
+                
+                if(hueThumb) hueThumb.style.left = hueX + 'px';
+                if(sbCursor) { sbCursor.style.left = sbX + 'px'; sbCursor.style.top = sbY + 'px'; }
+                
+                const hex = this.hsvToHex(this.colorState.h, this.colorState.s, this.colorState.v);
+                const preview = document.getElementById('cs-preview');
+                const input = document.getElementById('cs-hex-input');
+                
+                if(preview) preview.style.background = hex;
+                if(input && document.activeElement !== input) input.value = hex;
+                
+                this.setColor(hex, false); 
+            };
+
+            // Event Handlers
+            const handleSB = (e) => {
+                const rect = sbCanvas.getBoundingClientRect();
+                let x = Math.max(0, Math.min(220, e.clientX - rect.left));
+                let y = Math.max(0, Math.min(220, e.clientY - rect.top));
+                this.colorState.s = x / 220;
+                this.colorState.v = 1 - (y / 220);
+                updateUI();
+            };
             
-            // Move Cursors
-            const hueX = (this.colorState.h / 360) * 220;
-            const sbX = this.colorState.s * 220;
-            const sbY = (1 - this.colorState.v) * 220;
+            const handleHue = (e) => {
+                const rect = hueCanvas.getBoundingClientRect();
+                let x = Math.max(0, Math.min(220, e.clientX - rect.left));
+                this.colorState.h = (x / 220) * 360;
+                updateUI();
+            };
+
+            const sbBox = document.getElementById('cs-sb-box');
+            sbBox.onpointerdown = (e) => { 
+                sbBox.setPointerCapture(e.pointerId); 
+                handleSB(e); 
+                sbBox.onpointermove = handleSB; 
+            };
+            sbBox.onpointerup = (e) => { 
+                sbBox.onpointermove = null; 
+                if(!this.recentColors.includes(this.settings.color)) {
+                   this.recentColors.unshift(this.settings.color);
+                   if(this.recentColors.length > 7) this.recentColors.pop();
+                   renderSwatches();
+                }
+            };
             
-            document.getElementById('cs-hue-thumb').style.left = hueX + 'px';
-            document.getElementById('cs-sb-cursor').style.left = sbX + 'px';
-            document.getElementById('cs-sb-cursor').style.top = sbY + 'px';
+            const hueRail = document.getElementById('cs-hue-rail');
+            hueRail.onpointerdown = (e) => { hueRail.setPointerCapture(e.pointerId); handleHue(e); hueRail.onpointermove = handleHue; };
+            hueRail.onpointerup = () => { hueRail.onpointermove = null; };
             
-            const hex = this.hsvToHex(this.colorState.h, this.colorState.s, this.colorState.v);
-            document.getElementById('cs-preview').style.background = hex;
-            document.getElementById('cs-hex-input').value = hex;
-            this.setColor(hex);
-        };
-        
-        // Interaction Handlers
-        const handleSB = (e) => {
-            const rect = sbCanvas.getBoundingClientRect();
-            let x = Math.max(0, Math.min(220, e.clientX - rect.left));
-            let y = Math.max(0, Math.min(220, e.clientY - rect.top));
-            this.colorState.s = x / 220;
-            this.colorState.v = 1 - (y / 220);
+            const hexInput = document.getElementById('cs-hex-input');
+            hexInput.onchange = (e) => { this.setColor(e.target.value, true); updateUI(); };
+
+            renderSwatches();
             updateUI();
-        };
-        
-        const handleHue = (e) => {
-            const rect = hueCanvas.getBoundingClientRect();
-            let x = Math.max(0, Math.min(220, e.clientX - rect.left));
-            this.colorState.h = (x / 220) * 360;
-            updateUI();
-        };
-
-        const sbBox = document.getElementById('cs-sb-box');
-        sbBox.onpointerdown = (e) => { sbBox.setPointerCapture(e.pointerId); handleSB(e); sbBox.onpointermove = handleSB; };
-        sbBox.onpointerup = () => { sbBox.onpointermove = null; };
-        
-        const hueRail = document.getElementById('cs-hue-rail');
-        hueRail.onpointerdown = (e) => { hueRail.setPointerCapture(e.pointerId); handleHue(e); hueRail.onpointermove = handleHue; };
-        hueRail.onpointerup = () => { hueRail.onpointermove = null; };
-        
-        document.getElementById('cs-hex-input').onchange = (e) => {
-            this.setColor(e.target.value); updateUI(); 
-        };
-
-        updateUI();
+        }, 50);
     }
 
     hsvToHex(h, s, v) {
