@@ -59,6 +59,7 @@ class ProSketch {
         this.width = 2400; this.height = 1800;
         this.canvas.width = this.width; this.canvas.height = this.height;
         this.container.style.width = this.width + 'px'; this.container.style.height = this.height + 'px';
+        this.container.style.transformOrigin = '0 0';
         this.layerManager.init(this.width, this.height);
         this.pencilPattern = this.createTexture();
         this.bindEvents();
@@ -92,12 +93,12 @@ class ProSketch {
         this.touchStartTime = Date.now();
         this.activePointers.set(e.pointerId, e);
         
-        if (this.activePointers.size === 2) { this.startGesture(); return; }
+        if (this.activePointers.size === 2) { this.prepareGesture(); return; }
         
         if (!this.isGesture && e.button === 0) {
             this.isDrawing = true;
             const pos = this.toWorld(e.clientX, e.clientY);
-            const p = e.pressure || 0.5;
+            const p = this.getPressure(e.pressure || 0.5);
             this.points = [[pos.x, pos.y, p], [pos.x + 0.1, pos.y + 0.1, p]];
             this.isSnapped = false;
             this.snapStartPos = pos;
@@ -111,7 +112,10 @@ class ProSketch {
 
     onMove(e) {
         if (this.activePointers.has(e.pointerId)) this.activePointers.set(e.pointerId, e);
-        if (this.isGesture && this.activePointers.size === 2) { this.handleGesture(); return; }
+        if (this.activePointers.size === 2) {
+            this.isGesture = true;
+            this.handleGesture(); return;
+        }
         
         if (this.isDrawing && this.activePointers.size === 1) {
             const pos = this.toWorld(e.clientX, e.clientY);
@@ -182,7 +186,7 @@ class ProSketch {
 
     drawSymmetry(ctx, points, size, color, cfg, opacity = 1, symmetry = 'none') {
         const render = (pts) => {
-            if (this.settings.tool === 'pencil') {
+            if (cfg.type === 'textured') {
                 this.drawTexturedStroke(ctx, pts, size, color, 'pencil', opacity);
             } else if (cfg.type === 'particle') {
                 this.drawParticles(ctx, pts, size, color, cfg.effect, opacity);
@@ -271,7 +275,7 @@ class ProSketch {
         d.push("Z"); return d.join(" ");
     }
 
-        commitStroke() {
+    commitStroke() {
         // --- SMART LAYER SELECTION START ---
         // 1. Try to get the active layer
         let layer = this.layerManager.getActive();
@@ -346,11 +350,7 @@ class ProSketch {
             if(!l) return;
 
             if (act.type === 'stroke') {
-                if(act.config.type === 'textured' || (this.settings.tool === 'pencil' && act.config.texture)) { 
-                     this.drawTexturedStroke(l.ctx, act.points, act.size, act.color, 'pencil', act.opacity);
-                } else {
-                     this.drawSymmetry(l.ctx, act.points, act.size, act.color, act.config, act.opacity, act.symmetry); 
-                }
+                this.drawSymmetry(l.ctx, act.points, act.size, act.color, act.config, act.opacity, act.symmetry); 
             }
             else if (act.type === 'shape') this.drawGeometricShape(l.ctx, act.start, act.end, act.shape, act.color, act.size, act.opacity);
             else if (act.type === 'text') this.addTextToCtx(l.ctx, act.x, act.y, act.text, act.color, act.size);
@@ -503,8 +503,8 @@ class ProSketch {
         ctx.putImageData(imageData, 0, 0);
     }
 
-    startGesture() {
-        this.isGesture = true; this.isDrawing = false;
+    prepareGesture() {
+        this.isDrawing = false;
         const pts = Array.from(this.activePointers.values());
         const p1 = {x:pts[0].clientX, y:pts[0].clientY}; const p2 = {x:pts[1].clientX, y:pts[1].clientY};
         this.gestStart = { dist: Vec.dist(p1, p2), center: Vec.mid(p1, p2), zoom: this.camera.zoom, cam: { ...this.camera } };
@@ -520,7 +520,7 @@ class ProSketch {
         this.updateCamera();
     }
 
-    updateCamera() { this.container.style.transform = `translate(${this.camera.x}px, ${this.camera.y}px) scale(${this.camera.zoom})`; }
+    updateCamera() { this.container.style.transform = `translate(${this.camera.x}px, \( {this.camera.y}px) scale( \){this.camera.zoom})`; }
     toWorld(x, y) { const rect = this.canvas.getBoundingClientRect(); return { x: (x - rect.left) * (this.width / rect.width), y: (y - rect.top) * (this.height / rect.height) }; }
     resetView() { const vp = document.getElementById('viewport'); const scale = Math.min(vp.clientWidth/this.width, vp.clientHeight/this.height) * 0.85; this.camera = { x: (vp.clientWidth - this.width*scale)/2, y: (vp.clientHeight - this.height*scale)/2, zoom: scale }; this.updateCamera(); }
     onWheel(e) { if (e.ctrlKey) { e.preventDefault(); this.camera.zoom = Math.max(0.1, Math.min(5, this.camera.zoom - e.deltaY * 0.002)); this.updateCamera(); } else { this.camera.x -= e.deltaX; this.camera.y -= e.deltaY; this.updateCamera(); } }
@@ -647,7 +647,7 @@ class ProSketch {
         const grid = document.getElementById('gallery-grid'); if (!grid) return;
         if (this.gallery.length === 0) { grid.innerHTML = `<div style="text-align:center; color:#999; grid-column:1/-1;">No saved art yet! 🎨</div>`; return; }
         grid.innerHTML = this.gallery.map(item => `
-            <div class="gallery-card"><img src="${item.thumb}" onclick="app.loadFromGallery(${item.id})"><div class="gallery-actions"><span>${item.date}</span><div style="display:flex; gap:10px;"><span onclick="app.downloadFromGallery(${item.id})" style="color:#6366f1; cursor:pointer;" title="Download PNG">⬇️</span><span onclick="app.deleteFromGallery(${item.id})" style="color:#ef4444; cursor:pointer;" title="Delete">🗑️</span></div></div></div>`).join('');
+            <div class="gallery-card"><img src="\( {item.thumb}" onclick="app.loadFromGallery( \){item.id})"><div class="gallery-actions"><span>\( {item.date}</span><div style="display:flex; gap:10px;"><span onclick="app.downloadFromGallery( \){item.id})" style="color:#6366f1; cursor:pointer;" title="Download PNG">⬇️</span><span onclick="app.deleteFromGallery(${item.id})" style="color:#ef4444; cursor:pointer;" title="Delete">🗑️</span></div></div></div>`).join('');
     }
     loadTemplate(type) {
         this.toggleTemplateModal(false);
@@ -732,7 +732,7 @@ class ProSketch {
         // Render Swatches
         const renderSwatches = () => {
             const grid = document.getElementById('cs-recent-grid');
-            grid.innerHTML = this.recentColors.map(c => `<div class="cs-swatch" style="background:${c}" onclick="app.setColor('${c}'); app.toggleColorStudio(false);"></div>`).join('');
+            grid.innerHTML = this.recentColors.map(c => `<div class="cs-swatch" style="background:\( {c}" onclick="app.setColor(' \){c}'); app.toggleColorStudio(false);"></div>`).join('');
         };
         renderSwatches();
 
@@ -809,7 +809,7 @@ class ProSketch {
             case 5: r = v; g = p; b = q; break;
         }
         const toHex = x => { const val = Math.round(x * 255).toString(16); return val.length === 1 ? '0' + val : val; };
-        return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+        return `#\( {toHex(r)} \){toHex(g)}${toHex(b)}`;
     }
 }
 window.app = new ProSketch();
