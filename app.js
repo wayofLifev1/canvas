@@ -712,8 +712,8 @@ class ProSketch {
         return Math.atan2(pts[1].clientY - pts[0].clientY, pts[1].clientX - pts[0].clientX);
     }
 
-    updateCamera() { 
-        this.container.style.transform = `translate(${this.camera.x}px, \( {this.camera.y}px) rotate( \){this.camera.rotation}deg) scale(${this.camera.zoom})`; 
+        updateCamera() { 
+        this.container.style.transform = `translate(${this.camera.x}px, ${this.camera.y}px) rotate(${this.camera.rotation}deg) scale(${this.camera.zoom})`; 
     }
 
     toWorld(x, y) { 
@@ -922,13 +922,22 @@ class ProSketch {
         document.body.appendChild(link); link.click(); document.body.removeChild(link);
     }
 
-    refreshGalleryModal() {
+        refreshGalleryModal() {
         const grid = document.getElementById('gallery-grid'); if (!grid) return;
         if (this.gallery.length === 0) { grid.innerHTML = `<div style="text-align:center; color:#999; grid-column:1/-1;">No saved art yet! 🎨</div>`; return; }
         grid.innerHTML = this.gallery.map(item => `
-            <div class="gallery-card"><img src="\( {item.thumb}" onclick="app.loadFromGallery( \){item.id})"><div class="gallery-actions"><span>\( {item.date}</span><div style="display:flex; gap:10px;"><span onclick="app.downloadFromGallery( \){item.id})" style="color:#6366f1; cursor:pointer;" title="Download PNG">⬇️</span><span onclick="app.deleteFromGallery(${item.id})" style="color:#ef4444; cursor:pointer;" title="Delete">🗑️</span></div></div></div>`).join('');
+            <div class="gallery-card">
+                <img src="${item.thumb}" onclick="app.loadFromGallery(${item.id})">
+                <div class="gallery-actions">
+                    <span>${item.date}</span>
+                    <div style="display:flex; gap:10px;">
+                        <span onclick="app.downloadFromGallery(${item.id})" style="color:#6366f1; cursor:pointer;" title="Download PNG">⬇️</span>
+                        <span onclick="app.deleteFromGallery(${item.id})" style="color:#ef4444; cursor:pointer;" title="Delete">🗑️</span>
+                    </div>
+                </div>
+            </div>`).join('');
     }
-
+    
     loadTemplate(type) {
         this.toggleTemplateModal(false);
         const guideLayer = this.layerManager.addLayer('Guide'); const ctx = guideLayer.ctx;
@@ -1023,9 +1032,11 @@ class ProSketch {
         for(let i=0; i<=360; i+=60) hueGrad.addColorStop(i/360, `hsl(${i}, 100%, 50%)`);
         hueCtx.fillStyle = hueGrad; hueCtx.fillRect(0,0, hueCanvas.width, hueCanvas.height);
         
-        const renderSwatches = () => {
+                const renderSwatches = () => {
             const grid = document.getElementById('cs-recent-grid');
-            grid.innerHTML = this.recentColors.map(c => `<div class="cs-swatch" style="background:\( {c}" onclick="app.setColor(' \){c}'); app.toggleColorStudio(false);"></div>`).join('');
+            grid.innerHTML = this.recentColors.map(c => 
+                `<div class="cs-swatch" style="background:${c}" onclick="app.setColor('${c}'); app.toggleColorStudio(false);"></div>`
+            ).join('');
         };
         renderSwatches();
 
@@ -1086,7 +1097,7 @@ class ProSketch {
         updateUI();
     }
 
-    hsvToHex(h, s, v) {
+        hsvToHex(h, s, v) {
         let r, g, b, i, f, p, q, t;
         h = h / 360; i = Math.floor(h * 6); f = h * 6 - i;
         p = v * (1 - s); q = v * (1 - f * s); t = v * (1 - (1 - f) * s);
@@ -1099,7 +1110,8 @@ class ProSketch {
             case 5: r = v; g = p; b = q; break;
         }
         const toHex = x => { const val = Math.round(x * 255).toString(16); return val.length === 1 ? '0' + val : val; };
-        return `#\( {toHex(r)} \){toHex(g)}${toHex(b)}`;
+        // FIXED LINE BELOW:
+        return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
     }
 
     hexToHsv(hex) {
