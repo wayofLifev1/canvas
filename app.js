@@ -306,33 +306,30 @@ class ProSketch {
             point[2]
         ];
     }
-
-        drawTexturedStroke(ctx, points, baseSize, color, tool, opacity) {
+    drawTexturedStroke(ctx, points, baseSize, color, tool, opacity) {
         if (points.length < 2) return;
         ctx.save();
         ctx.globalCompositeOperation = 'source-over'; 
         ctx.globalAlpha = opacity; 
         ctx.fillStyle = color;
         
-        // Removed the 'skip' logic to ensure no gaps in the line
+        // FIX: Removed the 'skip' variable. We must draw every segment to prevent gaps.
         for (let i = 1; i < points.length; i++) {
             const p1 = points[i-1]; 
             const p2 = points[i];
             
             const dist = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]);
-            if (dist < 0.5) continue; // Optimization for very close points
+            if (dist < 1) continue; 
             
-            // Calculate width based on pressure
+            // FIX: Changed 'dist / 3' to 'dist / 1'. 
+            // Since your particle size is 1.5px (see below), stepping by 3px creates gaps.
+            // Stepping by 1 ensures they overlap and look like a solid textured line.
+            const steps = Math.ceil(dist / 1); 
+
             const pressure1 = p1[2] || 0.5; 
             const pressure2 = p2[2] || 0.5;
-            const w1 = baseSize * (0.5 + pressure1 * 0.8); 
-            const w2 = baseSize * (0.5 + pressure2 * 0.8);
-            
-            // Calculate solid steps based on brush size
-            // Smaller steps = more solid line
-            const stepSize = Math.max(0.5, baseSize / 15); 
-            const steps = Math.ceil(dist / stepSize); 
-
+            const w1 = baseSize * (0.2 + pressure1 * 0.8); 
+            const w2 = baseSize * (0.2 + pressure2 * 0.8);
             const xDiff = p2[0] - p1[0]; 
             const yDiff = p2[1] - p1[1]; 
             const wDiff = w2 - w1;
@@ -343,24 +340,12 @@ class ProSketch {
                 const y = p1[1] + (yDiff * t); 
                 const w = w1 + (wDiff * t);
                 
-                // Texture: Draw multiple particles per step to create density
-                // This ensures the line looks solid but still textured
-                const density = Math.max(1, Math.ceil(w / 1.5)); 
-                
-                for(let d=0; d < density; d++) { 
+                // EXACT SAME TEXTURE STYLE AS YOUR ORIGINAL CODE
+                for(let d=0; d<3; d++) { 
                     const angle = Math.random() * 6.28; 
                     const offset = Math.random() * (w/2); 
-                    
-                    // FIX: Particle size now scales with brush width (min 1.5px)
-                    const particleSize = Math.max(1.5, w / 6); 
-                    
                     ctx.beginPath(); 
-                    ctx.rect(
-                        x + Math.cos(angle)*offset, 
-                        y + Math.sin(angle)*offset, 
-                        particleSize, 
-                        particleSize
-                    ); 
+                    ctx.rect(x + Math.cos(angle)*offset, y + Math.sin(angle)*offset, 1.5, 1.5); 
                     ctx.fill();
                 } 
             }
@@ -368,7 +353,7 @@ class ProSketch {
         ctx.restore();
     }
 
-     drawStroke(ctx, points, size, color, cfg, opacity = 1) {
+    drawStroke(ctx, points, size, color, cfg, opacity = 1) {
         if (points.length < 2) return;
         const options = { 
             size: size, thinning: cfg.thinning, smoothing: cfg.smoothing, 
@@ -377,24 +362,26 @@ class ProSketch {
         };
         const outline = getStroke(points, options);
         
-        // FIX: Changed second argument to 'true' to close the path
+        // FIX: Changed 'false' to 'true' in the second argument.
+        // This closes the path calculation, removing the dotted artifacts on solid lines.
         const path = new Path2D(this.getSvgPath(outline, true)); 
         
         ctx.save();
         ctx.globalCompositeOperation = cfg.composite || 'source-over'; 
         ctx.globalAlpha = opacity * (cfg.opacity || 1);
-        
         if (cfg.glow) { 
             ctx.shadowBlur = size * 1.5; 
             ctx.shadowColor = color; 
             ctx.fillStyle = '#ffffff'; 
             ctx.fill(path); 
-        } else { 
+        } 
+        else { 
             ctx.fillStyle = color; 
             ctx.fill(path); 
         }
         ctx.restore();
     }
+
       getSvgPath(stroke, close = true) {
         if (!stroke.length) return "";
         const d = stroke.reduce((acc, [x0, y0], i, arr) => { const [x1, y1] = arr[(i + 1) % arr.length]; acc.push(x0, y0, (x0 + x1) / 2, (y0 + y1) / 2); return acc; }, ["M", ...stroke[0], "Q"]);
