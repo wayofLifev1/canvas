@@ -13,7 +13,7 @@ class ProSketch {
         this.sound = new SoundManager(); 
         
         this.scaleFactor = 2.5; 
-        this.camera = { x: 0, y: 0, zoom: 1, rotation: 0 }; // Added rotation
+        this.camera = { x: 0, y: 0, zoom: 1 };
         
         this.activePointers = new Map();
         this.points = [];
@@ -26,7 +26,7 @@ class ProSketch {
         
         this.lastTapTime = 0;
         this.touchStartTime = 0;
-        this.maxTapTime = 300; // Increased for touch forgiveness
+        this.maxTapTime = 250; 
         this.snapTimer = null;
         this.isSnapped = false;
         this.snapStartPos = null;
@@ -34,40 +34,31 @@ class ProSketch {
         this.settings = { tool: 'pen', color: '#6366f1', size: 10, opacity: 1.0, symmetry: 'none', isPicking: false };
         this.history = []; this.redoStack = [];
         this.gallery = [];
-        this.brushLibrary = []; // New: for custom brushes
-        this.prefs = { darkMode: false, autoSaveInterval: 30000, muteSounds: false, minZoom: 0.25, maxZoom: 10 }; // New: preferences
 
-        // --- TOOLS CONFIG --- Expanded with more params
+        // --- TOOLS CONFIG ---
         this.tools = {
-            pencil: { type: 'textured', opacity: 0.85, composite: 'source-over', sizeMod: 1.2, spacing: 1, scatter: 0, angle: 0 },
-            pen: { thinning: 0.5, smoothing: 0.5, streamline: 0.5, start: { taper: 15, easing: (t) => t }, end: { taper: 20, easing: (t) => t }, opacity: 1, composite: 'source-over', sizeMod: 1.0, spacing: 1, scatter: 0, angle: 0 },
-            brush: { thinning: 0.7, smoothing: 0.8, streamline: 0.4, start: { taper: 20, easing: (t) => t * (2 - t) }, end: { taper: 30, easing: (t) => t * (2 - t) }, opacity: 0.9, composite: 'source-over', sizeMod: 2.5, spacing: 1, scatter: 0, angle: 0 },
-            marker: { thinning: -0.1, smoothing: 0.4, streamline: 0.5, start: { taper: 0 }, end: { taper: 0 }, opacity: 0.5, composite: 'multiply', sizeMod: 4.0, spacing: 1, scatter: 0, angle: 0 },
-            neon: { thinning: 0.5, smoothing: 0.5, streamline: 0.5, opacity: 1.0, composite: 'screen', sizeMod: 1.5, glow: true, spacing: 1, scatter: 0, angle: 0 },
-            airbrush: { type: 'particle', effect: 'spray', opacity: 0.35, sizeMod: 8.0, spacing: 1, scatter: 0, angle: 0 },
-            eraser: { type: 'eraser', sizeMod: 3.0, composite: 'destination-out', thinning:0, smoothing: 0.5, streamline: 0.5, spacing: 1, scatter: 0, angle: 0 },
-            bucket: { type: 'fill', tolerance: 0 },
+            pencil: { type: 'textured', opacity: 0.85, composite: 'source-over', sizeMod: 1.2 },
+            pen: { thinning: 0.5, smoothing: 0.5, streamline: 0.5, start: { taper: 15, easing: (t) => t }, end: { taper: 20, easing: (t) => t }, opacity: 1, composite: 'source-over', sizeMod: 1.0 },
+            brush: { thinning: 0.7, smoothing: 0.8, streamline: 0.4, start: { taper: 20, easing: (t) => t * (2 - t) }, end: { taper: 30, easing: (t) => t * (2 - t) }, opacity: 0.9, composite: 'source-over', sizeMod: 2.5 },
+            marker: { thinning: -0.1, smoothing: 0.4, streamline: 0.5, start: { taper: 0 }, end: { taper: 0 }, opacity: 0.5, composite: 'multiply', sizeMod: 4.0 },
+            neon: { thinning: 0.5, smoothing: 0.5, streamline: 0.5, opacity: 1.0, composite: 'screen', sizeMod: 1.5, glow: true },
+            airbrush: { type: 'particle', effect: 'spray', opacity: 0.35, sizeMod: 8.0 },
+            eraser: { type: 'eraser', sizeMod: 3.0, composite: 'destination-out', thinning:0, smoothing: 0.5, streamline: 0.5 },
+            bucket: { type: 'fill' },
             scissor: { type: 'scissor', sizeMod: 1.0, composite: 'source-over' },
-            rect: { type: 'shape', shape: 'rect', fill: false },
-            circle: { type: 'shape', shape: 'circle', fill: false },
+            rect: { type: 'shape', shape: 'rect' },
+            circle: { type: 'shape', shape: 'circle' },
             line: { type: 'shape', shape: 'line' },
-            text: { type: 'text' },
-            lasso: { type: 'lasso' }, // New
-            smudge: { type: 'smudge' }, // New
-            gradient: { type: 'gradient' } // New
+            text: { type: 'text' }
         };
 
         this.init();
     }
 
     init() {
-        this.loadPrefs(); // New: load preferences
-        this.loadRecentColors(); // New: persist recent colors
         this.width = 2400; this.height = 1800;
-        this.adjustCanvasForDevice(); // New: device detection
         this.canvas.width = this.width; this.canvas.height = this.height;
         this.container.style.width = this.width + 'px'; this.container.style.height = this.height + 'px';
-        this.container.style.transformOrigin = '0 0';
         this.layerManager.init(this.width, this.height);
         this.pencilPattern = this.createTexture();
         this.bindEvents();
@@ -75,43 +66,12 @@ class ProSketch {
         this.loadState();
         this.loadGallery();
         this.injectUI(); 
-        this.injectColorStyles(); 
+        this.injectColorStyles(); // Add styles for new picker
         this.requestRender();
-        this.autoSaveTimer = setInterval(() => this.saveState(), this.prefs.autoSaveInterval); // New: auto-save
-        this.showTutorialIfFirstLoad(); // New: tutorial
-        window.addEventListener('resize', this.handleResize.bind(this)); // New: for auto-scale
-    }
-
-    loadPrefs() {
-        const saved = localStorage.getItem('prosketch-prefs');
-        if (saved) this.prefs = { ...this.prefs, ...JSON.parse(saved) };
-    }
-
-    savePrefs() {
-        localStorage.setItem('prosketch-prefs', JSON.stringify(this.prefs));
-    }
-
-    loadRecentColors() {
-        const saved = localStorage.getItem('prosketch-recent-colors');
-        if (saved) this.recentColors = JSON.parse(saved);
-    }
-
-    saveRecentColors() {
-        localStorage.setItem('prosketch-recent-colors', JSON.stringify(this.recentColors));
-    }
-
-    adjustCanvasForDevice() {
-        if (/Mobi|Android/i.test(navigator.userAgent)) {
-            this.width = 1200; this.height = 900; // Scale down for mobile
-        }
-    }
-
-    handleResize() {
-        this.resetView();
     }
 
     bindEvents() {
-        const vp = document.getElementById('viewport') || document.body; // Fallback
+        const vp = document.getElementById('viewport');
         vp.style.touchAction = 'none'; 
         vp.addEventListener('pointerdown', this.onDown.bind(this), {passive:false});
         window.addEventListener('pointermove', this.onMove.bind(this), {passive:false});
@@ -119,25 +79,9 @@ class ProSketch {
         window.addEventListener('pointercancel', this.onUp.bind(this));
         vp.addEventListener('wheel', this.onWheel.bind(this), {passive:false});
         this.bindShortcuts();
-        this.canvas.addEventListener('contextmenu', this.onRightClick.bind(this)); // New: right-click menu
     }
 
-    onRightClick(e) {
-        e.preventDefault();
-        // Show context menu for tool options, etc.
-        this.showContextMenu(e.clientX, e.clientY);
-    }
-
-    showContextMenu(x, y) {
-        // Implement menu (e.g., div with options)
-        console.log('Context menu at', x, y);
-    }
-
-    getPressure(p, e) { 
-        // New: support tilt
-        const tilt = e.tiltX || 0;
-        return (1 - Math.cos(p * Math.PI)) / 2 * (1 + Math.sin(tilt * Math.PI / 180)); 
-    }
+    getPressure(p) { return (1 - Math.cos(p * Math.PI)) / 2; }
 
     onDown(e) {
         e.preventDefault();
@@ -148,18 +92,17 @@ class ProSketch {
         this.touchStartTime = Date.now();
         this.activePointers.set(e.pointerId, e);
         
-        if (this.activePointers.size === 2) { this.prepareGesture(); return; }
-        if (this.activePointers.size === 3) { this.prepareRotateGesture(); return; } // New: three-finger rotate
+        if (this.activePointers.size === 2) { this.startGesture(); return; }
         
         if (!this.isGesture && e.button === 0) {
             this.isDrawing = true;
             const pos = this.toWorld(e.clientX, e.clientY);
-            const p = this.getPressure(e.pressure || 0.5, e);
+            const p = e.pressure || 0.5;
             this.points = [[pos.x, pos.y, p], [pos.x + 0.1, pos.y + 0.1, p]];
             this.isSnapped = false;
             this.snapStartPos = pos;
             
-            const shapes = ['rect', 'circle', 'line', 'text', 'bucket', 'scissor', 'lasso', 'gradient'];
+            const shapes = ['rect', 'circle', 'line', 'text', 'bucket', 'scissor'];
             if (!shapes.includes(this.settings.tool)) {
                 this.snapTimer = setTimeout(() => this.triggerSnap(), 600);
             }
@@ -168,20 +111,13 @@ class ProSketch {
 
     onMove(e) {
         if (this.activePointers.has(e.pointerId)) this.activePointers.set(e.pointerId, e);
-        if (this.activePointers.size === 2) {
-            this.isGesture = true;
-            this.handleGesture(); return;
-        }
-        if (this.activePointers.size === 3) {
-            this.isGesture = true;
-            this.handleRotateGesture(); return; // New
-        }
+        if (this.isGesture && this.activePointers.size === 2) { this.handleGesture(); return; }
         
         if (this.isDrawing && this.activePointers.size === 1) {
             const pos = this.toWorld(e.clientX, e.clientY);
             const tool = this.tools[this.settings.tool];
 
-            if (tool.type === 'shape' || tool.type === 'lasso' || tool.type === 'gradient') {
+            if (tool.type === 'shape') {
                 this.points[1] = [pos.x, pos.y, e.pressure||0.5];
                 this.renderLive();
                 return;
@@ -195,25 +131,17 @@ class ProSketch {
                 clearTimeout(this.snapTimer); this.snapTimer = null; 
             }
 
-            let coalesced = e.getCoalescedEvents ? e.getCoalescedEvents() : [e]; // Fallback polyfill
-            coalesced.forEach(ce => { 
-                const p = this.toWorld(ce.clientX, ce.clientY); 
-                const rawP = ce.pressure || 0.5;
-                this.points.push([p.x, p.y, this.getPressure(rawP, ce)]); 
-            });
-            this.stabilizePoints(); // New: stroke stabilization
+            if (e.getCoalescedEvents) { 
+                e.getCoalescedEvents().forEach(ce => { 
+                    const p = this.toWorld(ce.clientX, ce.clientY); 
+                    const rawP = ce.pressure || 0.5;
+                    this.points.push([p.x, p.y, this.getPressure(rawP)]); 
+                }); 
+            } else { 
+                const rawP = e.pressure || 0.5;
+                this.points.push([pos.x, pos.y, this.getPressure(rawP)]); 
+            }
             this.renderLive();
-        }
-    }
-
-    stabilizePoints() {
-        // New: average last 5 points for smoothness
-        if (this.points.length > 5) {
-            const last = this.points.slice(-5);
-            const avgX = last.reduce((sum, p) => sum + p[0], 0) / 5;
-            const avgY = last.reduce((sum, p) => sum + p[1], 0) / 5;
-            const avgP = last.reduce((sum, p) => sum + p[2], 0) / 5;
-            this.points[this.points.length - 1] = [avgX, avgY, avgP];
         }
     }
 
@@ -228,40 +156,24 @@ class ProSketch {
             this.isGesture = false;
             if (this.isDrawing) { this.isDrawing = false; this.commitStroke(); this.points = []; this.requestRender(); }
         }
-        if (this.activePointers.size === 0) this.activePointers.clear(); // Cleanup
     }
     
     triggerSnap() {
         if (!this.isDrawing) return;
         this.isSnapped = true;
-        if (!this.prefs.muteSounds) this.sound.play('pop'); 
+        this.sound.play('pop'); 
         this.showToast("Straight Line! 📏");
         const start = this.points[0]; const end = this.points[this.points.length-1];
-        this.points = [start, this.snapToAngle(start, end)]; // New: angle snapping
-        this.renderLive();
+        this.points = [start, end]; this.renderLive();
         if (navigator.vibrate) navigator.vibrate(20);
-    }
-
-    snapToAngle(start, end) {
-        // New: snap to 15° increments
-        const dx = end[0] - start[0];
-        const dy = end[1] - start[1];
-        const angle = Math.atan2(dy, dx);
-        const snappedAngle = Math.round(angle / (Math.PI / 12)) * (Math.PI / 12);
-        const dist = Math.hypot(dx, dy);
-        return [start[0] + Math.cos(snappedAngle) * dist, start[1] + Math.sin(snappedAngle) * dist, end[2]];
     }
 
     renderLive() {
         this.composeLayers();
-        if (this.settings.tool === 'scissor' || this.settings.tool === 'lasso') { this.drawScissorPath(this.ctx, this.points); return; }
+        if (this.settings.tool === 'scissor') { this.drawScissorPath(this.ctx, this.points); return; }
         const toolCfg = this.tools[this.settings.tool];
         if (toolCfg.type === 'shape' && this.points.length >= 2) {
-            this.drawGeometricShape(this.ctx, this.points[0], this.points[1], toolCfg.shape, this.settings.color, this.settings.size, this.settings.opacity, toolCfg.fill);
-            return;
-        }
-        if (toolCfg.type === 'gradient' && this.points.length >= 2) {
-            this.drawGradient(this.ctx, this.points[0], this.points[1]);
+            this.drawGeometricShape(this.ctx, this.points[0], this.points[1], toolCfg.shape, this.settings.color, this.settings.size, this.settings.opacity);
             return;
         }
         const size = (this.settings.size * toolCfg.sizeMod) * (this.scaleFactor * 0.6); 
@@ -270,12 +182,10 @@ class ProSketch {
 
     drawSymmetry(ctx, points, size, color, cfg, opacity = 1, symmetry = 'none') {
         const render = (pts) => {
-            if (cfg.type === 'textured') {
+            if (this.settings.tool === 'pencil') {
                 this.drawTexturedStroke(ctx, pts, size, color, 'pencil', opacity);
             } else if (cfg.type === 'particle') {
                 this.drawParticles(ctx, pts, size, color, cfg.effect, opacity);
-            } else if (cfg.type === 'smudge') {
-                this.smudgeStroke(ctx, pts, size); // New
             } else {
                 this.drawStroke(ctx, pts, size, color, cfg, opacity);
             }
@@ -285,68 +195,26 @@ class ProSketch {
         if (symmetry === 'x' || symmetry === 'quad') render(points.map(p => [w - p[0], p[1], p[2]]));
         if (symmetry === 'y' || symmetry === 'quad') render(points.map(p => [p[0], h - p[1], p[2]]));
         if (symmetry === 'quad') render(points.map(p => [w - p[0], h - p[1], p[2]]));
-        if (symmetry === 'radial') this.drawRadialSymmetry(ctx, points, size, color, cfg, opacity); // New
     }
 
-    drawRadialSymmetry(ctx, points, size, color, cfg, opacity) {
-        // New: 8-way radial
-        for (let i = 0; i < 8; i++) {
-            const angle = (i * 45) * Math.PI / 180;
-            const rotated = points.map(p => this.rotatePoint(p, angle, this.width / 2, this.height / 2));
-            this.drawStroke(ctx, rotated, size, color, cfg, opacity);
-        }
-    }
-
-    rotatePoint(point, angle, cx, cy) {
-        const x = point[0] - cx;
-        const y = point[1] - cy;
-        return [
-            cx + x * Math.cos(angle) - y * Math.sin(angle),
-            cy + x * Math.sin(angle) + y * Math.cos(angle),
-            point[2]
-        ];
-    }
     drawTexturedStroke(ctx, points, baseSize, color, tool, opacity) {
         if (points.length < 2) return;
         ctx.save();
-        ctx.globalCompositeOperation = 'source-over'; 
-        ctx.globalAlpha = opacity; 
-        ctx.fillStyle = color;
-        
-        // FIX: Removed the 'skip' variable. We must draw every segment to prevent gaps.
-        for (let i = 1; i < points.length; i++) {
-            const p1 = points[i-1]; 
-            const p2 = points[i];
-            
+        ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = opacity; ctx.fillStyle = color;
+        const skip = points.length > 100 ? 2 : 1; 
+        for (let i = 1; i < points.length; i += skip) {
+            const p1 = points[i-skip]; const p2 = points[i];
             const dist = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]);
             if (dist < 1) continue; 
-            
-            // FIX: Changed 'dist / 3' to 'dist / 1'. 
-            // Since your particle size is 1.5px (see below), stepping by 3px creates gaps.
-            // Stepping by 1 ensures they overlap and look like a solid textured line.
-            const steps = Math.ceil(dist / 1); 
-
-            const pressure1 = p1[2] || 0.5; 
-            const pressure2 = p2[2] || 0.5;
-            const w1 = baseSize * (0.2 + pressure1 * 0.8); 
-            const w2 = baseSize * (0.2 + pressure2 * 0.8);
-            const xDiff = p2[0] - p1[0]; 
-            const yDiff = p2[1] - p1[1]; 
-            const wDiff = w2 - w1;
-            
+            const steps = Math.ceil(dist / 3); 
+            const pressure1 = p1[2] || 0.5; const pressure2 = p2[2] || 0.5;
+            const w1 = baseSize * (0.2 + pressure1 * 0.8); const w2 = baseSize * (0.2 + pressure2 * 0.8);
+            const xDiff = p2[0] - p1[0]; const yDiff = p2[1] - p1[1]; const wDiff = w2 - w1;
             for (let j = 0; j < steps; j++) {
-                const t = j / steps; 
-                const x = p1[0] + (xDiff * t); 
-                const y = p1[1] + (yDiff * t); 
-                const w = w1 + (wDiff * t);
-                
-                // EXACT SAME TEXTURE STYLE AS YOUR ORIGINAL CODE
+                const t = j / steps; const x = p1[0] + (xDiff * t); const y = p1[1] + (yDiff * t); const w = w1 + (wDiff * t);
                 for(let d=0; d<3; d++) { 
-                    const angle = Math.random() * 6.28; 
-                    const offset = Math.random() * (w/2); 
-                    ctx.beginPath(); 
-                    ctx.rect(x + Math.cos(angle)*offset, y + Math.sin(angle)*offset, 1.5, 1.5); 
-                    ctx.fill();
+                    const angle = Math.random() * 6.28; const offset = Math.random() * (w/2); 
+                    ctx.beginPath(); ctx.rect(x + Math.cos(angle)*offset, y + Math.sin(angle)*offset, 1.5, 1.5); ctx.fill();
                 } 
             }
         }
@@ -361,32 +229,12 @@ class ProSketch {
             simulatePressure: points[0].length < 3 || points[0][2] === 0.5 
         };
         const outline = getStroke(points, options);
-        
-        // FIX: Changed 'false' to 'true' in the second argument.
-        // This closes the path calculation, removing the dotted artifacts on solid lines.
-        const path = new Path2D(this.getSvgPath(outline, true)); 
-        
+        const path = new Path2D(this.getSvgPath(outline));
         ctx.save();
-        ctx.globalCompositeOperation = cfg.composite || 'source-over'; 
-        ctx.globalAlpha = opacity * (cfg.opacity || 1);
-        if (cfg.glow) { 
-            ctx.shadowBlur = size * 1.5; 
-            ctx.shadowColor = color; 
-            ctx.fillStyle = '#ffffff'; 
-            ctx.fill(path); 
-        } 
-        else { 
-            ctx.fillStyle = color; 
-            ctx.fill(path); 
-        }
+        ctx.globalCompositeOperation = cfg.composite || 'source-over'; ctx.globalAlpha = opacity * (cfg.opacity || 1);
+        if (cfg.glow) { ctx.shadowBlur = size * 1.5; ctx.shadowColor = color; ctx.fillStyle = '#ffffff'; ctx.fill(path); } 
+        else { ctx.fillStyle = color; ctx.fill(path); }
         ctx.restore();
-    }
-
-      getSvgPath(stroke, close = true) {
-        if (!stroke.length) return "";
-        const d = stroke.reduce((acc, [x0, y0], i, arr) => { const [x1, y1] = arr[(i + 1) % arr.length]; acc.push(x0, y0, (x0 + x1) / 2, (y0 + y1) / 2); return acc; }, ["M", ...stroke[0], "Q"]);
-        if (close) d.push("Z"); 
-        return d.join(" ");
     }
 
     drawParticles(ctx, points, size, color, effect, opacity) {
@@ -410,20 +258,6 @@ class ProSketch {
         ctx.restore();
     }
 
-    smudgeStroke(ctx, points, size) {
-        // New: basic smudge - blend pixels
-        points.forEach(p => {
-            const imgData = ctx.getImageData(p[0] - size/2, p[1] - size/2, size, size);
-            // Blend logic (average colors, etc.)
-            ctx.putImageData(this.blendData(imgData), p[0] - size/2, p[1] - size/2);
-        });
-    }
-
-    blendData(imgData) {
-        // Implement blending
-        return imgData; // Placeholder
-    }
-
     createTexture() {
         const c = document.createElement('canvas'); c.width=64; c.height=64; 
         const x = c.getContext('2d');
@@ -431,43 +265,44 @@ class ProSketch {
         return this.ctx.createPattern(c, 'repeat');
     }
 
-    commitStroke() {
+    getSvgPath(stroke) {
+        if (!stroke.length) return "";
+        const d = stroke.reduce((acc, [x0, y0], i, arr) => { const [x1, y1] = arr[(i + 1) % arr.length]; acc.push(x0, y0, (x0 + x1) / 2, (y0 + y1) / 2); return acc; }, ["M", ...stroke[0], "Q"]);
+        d.push("Z"); return d.join(" ");
+    }
+
+        commitStroke() {
+        // --- SMART LAYER SELECTION START ---
+        // 1. Try to get the active layer
         let layer = this.layerManager.getActive();
         
+        // 2. If current layer is missing or hidden, find one that works!
         if (!layer || !layer.visible) {
             const firstVisible = this.layerManager.layers.find(l => l.visible);
             if (firstVisible) {
                 this.layerManager.setActive(firstVisible.id);
                 layer = firstVisible;
-                this.showToast("Layer Auto-Selected 📄");
+                this.showToast("Layer Auto-Selected 📄"); // Notify the user
             } else {
                 this.showToast("No Visible Layers! 🚫");
                 return;
             }
         }
+        // --- SMART LAYER SELECTION END ---
 
         if (this.settings.tool === 'scissor') { this.performScissorCut(layer, this.points); return; }
-        if (this.settings.tool === 'lasso') { this.performLasso(layer, this.points); return; } // New
 
         const toolCfg = this.tools[this.settings.tool];
         
         if (toolCfg.type === 'shape') {
              if (this.points.length >= 2) {
-                 this.drawGeometricShape(layer.ctx, this.points[0], this.points[1], toolCfg.shape, this.settings.color, this.settings.size, this.settings.opacity, toolCfg.fill);
+                 this.drawGeometricShape(layer.ctx, this.points[0], this.points[1], toolCfg.shape, this.settings.color, this.settings.size, this.settings.opacity);
                  this.history.push({ 
                      type: 'shape', layerId: layer.id, shape: toolCfg.shape, 
                      start: this.points[0], end: this.points[1], 
-                     color: this.settings.color, size: this.settings.size, opacity: this.settings.opacity, fill: toolCfg.fill
+                     color: this.settings.color, size: this.settings.size, opacity: this.settings.opacity 
                  });
              }
-        } else if (toolCfg.type === 'gradient') {
-            if (this.points.length >= 2) {
-                this.drawGradient(layer.ctx, this.points[0], this.points[1]);
-                this.history.push({
-                    type: 'gradient', layerId: layer.id,
-                    start: this.points[0], end: this.points[1]
-                });
-            }
         } else {
             const size = (this.settings.size * toolCfg.sizeMod) * (this.scaleFactor * 0.6); 
             this.drawSymmetry(layer.ctx, this.points, size, this.settings.color, toolCfg, this.settings.opacity, this.settings.symmetry);
@@ -480,27 +315,22 @@ class ProSketch {
             });
         }
         this.redoStack = []; 
-        this.trimHistory(); // New: limit history
         this.saveState(); 
-    }
-
-    trimHistory() {
-        if (this.history.length > 50) this.history.shift();
     }
 
     undo() { 
         if(!this.history.length) { this.showToast('Nothing to Undo'); return; }
         const action = this.history.pop();
-        if (!this.prefs.muteSounds) this.sound.play('undo'); 
+        this.sound.play('undo'); 
         this.redoStack.push(action); 
-        this.rebuildLayers(action.layerId); // Incremental possible, but keep for now
+        this.rebuildLayers(action.layerId); 
         this.showToast('Undo ↩️'); 
     }
 
     redo() { 
         if(!this.redoStack.length) { this.showToast('Nothing to Redo'); return; }
         const action = this.redoStack.pop();
-        if (!this.prefs.muteSounds) this.sound.play('undo'); 
+        this.sound.play('undo'); 
         this.history.push(action); 
         this.rebuildLayers(action.layerId); 
         this.showToast('Redo ↪️');
@@ -516,39 +346,31 @@ class ProSketch {
             if(!l) return;
 
             if (act.type === 'stroke') {
-                this.drawSymmetry(l.ctx, act.points, act.size, act.color, act.config, act.opacity, act.symmetry); 
+                if(act.config.type === 'textured' || (this.settings.tool === 'pencil' && act.config.texture)) { 
+                     this.drawTexturedStroke(l.ctx, act.points, act.size, act.color, 'pencil', act.opacity);
+                } else {
+                     this.drawSymmetry(l.ctx, act.points, act.size, act.color, act.config, act.opacity, act.symmetry); 
+                }
             }
-            else if (act.type === 'shape') this.drawGeometricShape(l.ctx, act.start, act.end, act.shape, act.color, act.size, act.opacity, act.fill);
+            else if (act.type === 'shape') this.drawGeometricShape(l.ctx, act.start, act.end, act.shape, act.color, act.size, act.opacity);
             else if (act.type === 'text') this.addTextToCtx(l.ctx, act.x, act.y, act.text, act.color, act.size);
             else if (act.type === 'clear') l.ctx.clearRect(0,0,this.width, this.height);
-            else if (act.type === 'fill') this.runFloodFillAlgorithm(l.ctx, act.x, act.y, act.color, act.tolerance); // Added tolerance
-            else if (act.type === 'filter') this.applyFilter(act.filterType, l, true, act.intensity); // Added intensity
+            else if (act.type === 'fill') this.runFloodFillAlgorithm(l.ctx, act.x, act.y, act.color);
+            else if (act.type === 'filter') this.applyFilter(act.filterType, l, true);
             else if (act.type === 'scissor') this.applyScissor(l.ctx, act.points);
             else if (act.type === 'image') l.ctx.drawImage(act.img, act.x, act.y, act.w, act.h);
-            else if (act.type === 'gradient') this.drawGradient(l.ctx, act.start, act.end);
-            else if (act.type === 'lasso') this.applyLasso(l, act.points); // New
         });
         this.requestRender();
     }
 
-    drawGeometricShape(ctx, start, end, type, color, size, opacity, fill = false) {
-        ctx.save(); ctx.beginPath(); ctx.strokeStyle = color; ctx.fillStyle = color;
+    drawGeometricShape(ctx, start, end, type, color, size, opacity) {
+        ctx.save(); ctx.beginPath(); ctx.strokeStyle = color;
         ctx.lineWidth = size * this.scaleFactor * 0.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.globalAlpha = opacity;
         const w = end[0] - start[0]; const h = end[1] - start[1];
         if (type === 'line') { ctx.moveTo(start[0], start[1]); ctx.lineTo(end[0], end[1]); } 
         else if (type === 'rect') { ctx.rect(start[0], start[1], w, h); } 
         else if (type === 'circle') { const cx = start[0] + w/2; const cy = start[1] + h/2; ctx.ellipse(cx, cy, Math.abs(w/2), Math.abs(h/2), 0, 0, Math.PI*2); }
-        if (fill) ctx.fill();
         ctx.stroke(); ctx.restore();
-    }
-
-    drawGradient(ctx, start, end) {
-        // New: simple linear gradient
-        const grad = ctx.createLinearGradient(start[0], start[1], end[0], end[1]);
-        grad.addColorStop(0, this.settings.color);
-        grad.addColorStop(1, '#ffffff'); // Placeholder secondary color
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, this.width, this.height); // Fill whole or selected area
     }
 
     drawScissorPath(ctx, points) {
@@ -562,7 +384,7 @@ class ProSketch {
     performScissorCut(layer, points) {
         if (points.length < 3) return;
         this.applyScissor(layer.ctx, points);
-        if (!this.prefs.muteSounds) this.sound.play('trash'); 
+        this.sound.play('trash'); 
         this.history.push({ type: 'scissor', layerId: layer.id, points: [...points] });
         this.redoStack = []; this.saveState(); this.showToast("Cut Background! ✂️"); this.requestRender();
     }
@@ -573,19 +395,8 @@ class ProSketch {
         ctx.closePath(); ctx.globalCompositeOperation = 'destination-in'; ctx.fillStyle = 'black'; ctx.fill(); ctx.restore();
     }
 
-    performLasso(layer, points) {
-        // New: select and move/copy
-        this.applyLasso(layer, points);
-        this.history.push({ type: 'lasso', layerId: layer.id, points: [...points] });
-        this.requestRender();
-    }
-
-    applyLasso(layer, points) {
-        // Placeholder: clip and copy to new layer or transform
-    }
-
     promptText(x, y) {
-        const text = prompt("Enter text (max 100 chars):", "").slice(0, 100);
+        const text = prompt("Enter text:", "");
         if (text) {
             const layer = this.layerManager.getActive(); const size = this.settings.size * 5;
             this.addTextToCtx(layer.ctx, x, y, text, this.settings.color, size);
@@ -603,10 +414,7 @@ class ProSketch {
         const tools = [
             { id: 't-bucket', icon: '🪣', tool: 'bucket' }, { id: 't-scissor', icon: '✂️', tool: 'scissor' },
             { id: 't-rect', icon: '⬜', tool: 'rect' }, { id: 't-circle', icon: '⭕', tool: 'circle' },
-            { id: 't-line', icon: '📏', tool: 'line' }, { id: 't-text', icon: 'T', tool: 'text' },
-            { id: 't-lasso', icon: '🔗', tool: 'lasso' }, // New
-            { id: 't-smudge', icon: '🖐️', tool: 'smudge' }, // New
-            { id: 't-gradient', icon: '🌈', tool: 'gradient' } // New
+            { id: 't-line', icon: '📏', tool: 'line' }, { id: 't-text', icon: 'T', tool: 'text' }
         ];
         tools.forEach(t => {
             if (!document.getElementById(t.id)) {
@@ -617,9 +425,6 @@ class ProSketch {
         if (!document.getElementById('btn-clear-layer')) {
             const div = document.createElement('div'); div.className = 'btn-icon'; div.id = 'btn-clear-layer'; div.title = "Clear Layer"; div.onclick = () => this.clearLayer(); div.textContent = '🗑️'; div.style.color = '#ef4444'; topBarRight.insertBefore(div, topBarRight.firstChild);
         }
-        // New: add undo/redo buttons
-        const undoBtn = document.createElement('div'); undoBtn.className = 'btn-icon'; undoBtn.onclick = () => this.undo(); undoBtn.textContent = '↩️'; topBarRight.appendChild(undoBtn);
-        const redoBtn = document.createElement('div'); redoBtn.className = 'btn-icon'; redoBtn.onclick = () => this.redo(); redoBtn.textContent = '↪️'; topBarRight.appendChild(redoBtn);
     }
     
     injectColorStyles() {
@@ -642,24 +447,16 @@ class ProSketch {
         this.settings.tool = t;
         document.querySelectorAll('.case-tool').forEach(e => e.classList.remove('active')); 
         const el = document.getElementById('t-'+t); if(el) el.classList.add('active');
-        if (!this.prefs.muteSounds) this.sound.play('click'); 
+        this.sound.play('click'); 
         this.showToast(t.toUpperCase() + " Selected");
     }
 
     setColor(c) { 
-        try {
-            // Validate hex
-            if (!/^#[0-9A-F]{6}$/i.test(c)) throw new Error('Invalid hex');
-            this.settings.color = c; 
-            document.getElementById('curr-color').style.background = c; 
-            if(!this.recentColors.includes(c)) {
-                this.recentColors.unshift(c);
-                if(this.recentColors.length > 7) this.recentColors.pop();
-                this.saveRecentColors();
-            }
-            this.colorState = this.hexToHsv(c);
-        } catch (e) {
-            this.showToast('Invalid color!');
+        this.settings.color = c; 
+        document.getElementById('curr-color').style.background = c; 
+        if(!this.recentColors.includes(c)) {
+            this.recentColors.unshift(c);
+            if(this.recentColors.length > 7) this.recentColors.pop();
         }
     }
     
@@ -667,13 +464,8 @@ class ProSketch {
 
     runPicker(e) {
         const pos = this.toWorld(e.clientX, e.clientY);
-        const pixel = this.ctx.getImageData(pos.x - 1, pos.y - 1, 3, 3).data; // New: average 3x3
-        let r = 0, g = 0, b = 0;
-        for (let i = 0; i < pixel.length; i += 4) {
-            r += pixel[i]; g += pixel[i+1]; b += pixel[i+2];
-        }
-        r /= 9; g /= 9; b /= 9;
-        const hex = "#" + ((1 << 24) + (Math.round(r) << 16) + (Math.round(g) << 8) + Math.round(b)).toString(16).slice(1);
+        const pixel = this.ctx.getImageData(pos.x, pos.y, 1, 1).data;
+        const hex = "#" + ((1 << 24) + (pixel[0] << 16) + (pixel[1] << 8) + pixel[2]).toString(16).slice(1);
         this.setColor(hex); this.showToast(`Copied Color! 🎨`); this.settings.isPicking = false; 
     }
 
@@ -682,28 +474,28 @@ class ProSketch {
         const layer = this.layerManager.getActive();
         if (layer && layer.visible) {
             this.showToast("Filling... ⏳");
-            if (!this.prefs.muteSounds) this.sound.play('pop'); 
+            this.sound.play('pop'); 
             setTimeout(() => {
-                this.runFloodFillAlgorithm(layer.ctx, Math.floor(pos.x), Math.floor(pos.y), this.settings.color, this.tools.bucket.tolerance);
-                this.history.push({ type: 'fill', layerId: layer.id, x: Math.floor(pos.x), y: Math.floor(pos.y), color: this.settings.color, tolerance: this.tools.bucket.tolerance });
+                this.runFloodFillAlgorithm(layer.ctx, Math.floor(pos.x), Math.floor(pos.y), this.settings.color);
+                this.history.push({ type: 'fill', layerId: layer.id, x: Math.floor(pos.x), y: Math.floor(pos.y), color: this.settings.color });
                 this.requestRender(); this.saveState(); this.showToast("Filled! 🪣");
             }, 10);
         }
     }
     
-    runFloodFillAlgorithm(ctx, startX, startY, fillColorHex, tolerance = 0) {
+    runFloodFillAlgorithm(ctx, startX, startY, fillColorHex) {
         const w = this.width; const h = this.height;
         const imageData = ctx.getImageData(0, 0, w, h); const data = imageData.data;
         const r = parseInt(fillColorHex.slice(1,3), 16); const g = parseInt(fillColorHex.slice(3,5), 16); const b = parseInt(fillColorHex.slice(5,7), 16); const a = 255;
         const startIdx = (startY * w + startX) * 4;
         const startR = data[startIdx], startG = data[startIdx+1], startB = data[startIdx+2], startA = data[startIdx+3];
-        if (Math.abs(startR - r) <= tolerance && Math.abs(startG - g) <= tolerance && Math.abs(startB - b) <= tolerance && startA === a) return;
+        if (startR === r && startG === g && startB === b && startA === a) return;
         const stack = [[startX, startY]];
         while (stack.length) {
             const [cx, cy] = stack.pop();
             const idx = (cy * w + cx) * 4;
             if (cx < 0 || cx >= w || cy < 0 || cy >= h) continue;
-            if (Math.abs(data[idx] - startR) <= tolerance && Math.abs(data[idx+1] - startG) <= tolerance && Math.abs(data[idx+2] - startB) <= tolerance && data[idx+3] === startA) {
+            if (data[idx] === startR && data[idx+1] === startG && data[idx+2] === startB && data[idx+3] === startA) {
                 data[idx] = r; data[idx+1] = g; data[idx+2] = b; data[idx+3] = a;
                 stack.push([cx+1, cy]); stack.push([cx-1, cy]); stack.push([cx, cy+1]); stack.push([cx, cy-1]);
             }
@@ -711,8 +503,8 @@ class ProSketch {
         ctx.putImageData(imageData, 0, 0);
     }
 
-    prepareGesture() {
-        this.isDrawing = false;
+    startGesture() {
+        this.isGesture = true; this.isDrawing = false;
         const pts = Array.from(this.activePointers.values());
         const p1 = {x:pts[0].clientX, y:pts[0].clientY}; const p2 = {x:pts[1].clientX, y:pts[1].clientY};
         this.gestStart = { dist: Vec.dist(p1, p2), center: Vec.mid(p1, p2), zoom: this.camera.zoom, cam: { ...this.camera } };
@@ -722,101 +514,32 @@ class ProSketch {
         const pts = Array.from(this.activePointers.values());
         const p1 = {x:pts[0].clientX, y:pts[0].clientY}; const p2 = {x:pts[1].clientX, y:pts[1].clientY};
         const dist = Vec.dist(p1, p2); const center = Vec.mid(p1, p2); const scale = dist / this.gestStart.dist;
-        this.camera.zoom = Math.max(this.prefs.minZoom, Math.min(this.prefs.maxZoom, this.gestStart.zoom * scale));
+        this.camera.zoom = Math.max(0.1, Math.min(5, this.gestStart.zoom * scale));
         const dx = center.x - this.gestStart.center.x; const dy = center.y - this.gestStart.center.y;
         this.camera.x = this.gestStart.cam.x + dx; this.camera.y = this.gestStart.cam.y + dy;
         this.updateCamera();
     }
 
-    prepareRotateGesture() {
-        // New
-        const pts = Array.from(this.activePointers.values());
-        this.rotateStart = { angle: this.getAngleFromPoints(pts), rotation: this.camera.rotation };
-    }
-
-    handleRotateGesture() {
-        // New
-        const pts = Array.from(this.activePointers.values());
-        const angle = this.getAngleFromPoints(pts);
-        this.camera.rotation = this.rotateStart.rotation + (angle - this.rotateStart.angle);
-        this.updateCamera();
-    }
-
-    getAngleFromPoints(pts) {
-        // Calculate average angle
-        return Math.atan2(pts[1].clientY - pts[0].clientY, pts[1].clientX - pts[0].clientX);
-    }
-
-        updateCamera() { 
-        this.container.style.transform = `translate(${this.camera.x}px, ${this.camera.y}px) rotate(${this.camera.rotation}deg) scale(${this.camera.zoom})`; 
-    }
-
-    toWorld(x, y) { 
-        const rect = this.canvas.getBoundingClientRect(); // Cache if perf issue
-        return { x: (x - rect.left) * (this.width / rect.width), y: (y - rect.top) * (this.height / rect.height) }; 
-    }
-
-    resetView() { 
-        const vp = document.getElementById('viewport') || { clientWidth: window.innerWidth, clientHeight: window.innerHeight };
-        const scale = Math.min(vp.clientWidth/this.width, vp.clientHeight/this.height) * 0.85; 
-        this.camera = { x: (vp.clientWidth - this.width*scale)/2, y: (vp.clientHeight - this.height*scale)/2, zoom: scale, rotation: 0 }; 
-        this.updateCamera(); 
-    }
-
-    onWheel(e) { 
-        if (e.ctrlKey) { 
-            e.preventDefault(); 
-            const zoomDelta = -e.deltaY * 0.002;
-            const oldZoom = this.camera.zoom;
-            this.camera.zoom = Math.max(this.prefs.minZoom, Math.min(this.prefs.maxZoom, this.camera.zoom + zoomDelta));
-            // New: zoom to cursor
-            const rect = this.canvas.getBoundingClientRect();
-            const mx = e.clientX - rect.left;
-            const my = e.clientY - rect.top;
-            this.camera.x -= mx * (this.camera.zoom - oldZoom);
-            this.camera.y -= my * (this.camera.zoom - oldZoom);
-            this.updateCamera(); 
-        } else { 
-            this.camera.x -= e.deltaX; this.camera.y -= e.deltaY; this.updateCamera(); 
-        } 
-    }
+    updateCamera() { this.container.style.transform = `translate(${this.camera.x}px, ${this.camera.y}px) scale(${this.camera.zoom})`; }
+    toWorld(x, y) { const rect = this.canvas.getBoundingClientRect(); return { x: (x - rect.left) * (this.width / rect.width), y: (y - rect.top) * (this.height / rect.height) }; }
+    resetView() { const vp = document.getElementById('viewport'); const scale = Math.min(vp.clientWidth/this.width, vp.clientHeight/this.height) * 0.85; this.camera = { x: (vp.clientWidth - this.width*scale)/2, y: (vp.clientHeight - this.height*scale)/2, zoom: scale }; this.updateCamera(); }
+    onWheel(e) { if (e.ctrlKey) { e.preventDefault(); this.camera.zoom = Math.max(0.1, Math.min(5, this.camera.zoom - e.deltaY * 0.002)); this.updateCamera(); } else { this.camera.x -= e.deltaX; this.camera.y -= e.deltaY; this.updateCamera(); } }
 
     saveState() {
         if (this.saveTimeout) clearTimeout(this.saveTimeout);
         this.saveTimeout = setTimeout(() => {
-            try { 
-                // New: save layers as JSON for editable
-                const layersData = this.layerManager.layers.map(l => l.canvas.toDataURL());
-                localStorage.setItem('prosketch-layers', JSON.stringify(layersData)); 
-                const data = this.canvas.toDataURL('image/png', 0.5); localStorage.setItem('prosketch-kids', data); 
-            } catch (e) {}
+            try { const data = this.canvas.toDataURL('image/png', 0.5); localStorage.setItem('prosketch-kids', data); } catch (e) {}
         }, 1000);
     }
-
     loadState() {
         const data = localStorage.getItem('prosketch-kids');
-        const layersData = localStorage.getItem('prosketch-layers');
-        if (layersData) {
-            const parsed = JSON.parse(layersData);
-            parsed.forEach((src, i) => {
-                if (this.layerManager.layers[i]) {
-                    const img = new Image(); img.onload = () => { this.layerManager.layers[i].ctx.drawImage(img, 0, 0); this.requestRender(); };
-                    img.src = src;
-                }
-            });
-        } else if (data) {
+        if (data) {
             const img = new Image(); img.onload = () => { const layer = this.layerManager.layers[0]; layer.ctx.clearRect(0, 0, this.width, this.height); layer.ctx.drawImage(img, 0, 0); this.requestRender(); };
             img.src = data;
         }
-        this.colorState = this.hexToHsv(this.settings.color); // Sync
     }
-
-    showToast(msg) { 
-        const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2000); 
-    }
-
+    showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2000); }
     requestRender() { requestAnimationFrame(() => this.composeLayers()); }
-
     composeLayers() { 
         this.ctx.clearRect(0,0,this.width,this.height); 
         this.layerManager.layers.forEach(l => { if(l.visible) { this.ctx.globalAlpha = l.opacity; this.ctx.globalCompositeOperation = l.blend; this.ctx.drawImage(l.canvas, 0, 0); } }); 
@@ -848,53 +571,26 @@ class ProSketch {
                         <button onclick="app.triggerFilter('grayscale')" class="btn-filter">BW</button>
                         <button onclick="app.triggerFilter('sepia')" class="btn-filter">Sepia</button>
                         <button onclick="app.triggerFilter('invert')" class="btn-filter">Invert</button>
-                        <button onclick="app.triggerFilter('blur')" class="btn-filter">Blur</button> <!-- New -->
                      </div>
                 </div>
                 <div class="layer-item" onclick="app.resetView()" style="font-weight:bold; color:#6366f1;">🔍 Fit to Screen</div>
                 <div class="layer-item" onclick="app.fullReset()" style="color:var(--danger); font-weight:bold;">🗑️ Clear All</div>
-                <div class="layer-item" onclick="app.toggleDarkMode()" style="font-weight:bold;">🌙 Dark Mode</div> <!-- New -->
             `;
         }
     }
-
-    toggleDarkMode() {
-        this.prefs.darkMode = !this.prefs.darkMode;
-        document.body.classList.toggle('dark-mode', this.prefs.darkMode);
-        this.savePrefs();
-    }
-
     triggerFilter(type) {
         const layer = this.layerManager.getActive(); if(!layer) return;
-        this.applyFilter(type, layer, 1); // Intensity
-        this.history.push({ type: 'filter', layerId: layer.id, filterType: type, intensity: 1 }); this.requestRender();
+        this.applyFilter(type, layer); this.history.push({ type: 'filter', layerId: layer.id, filterType: type }); this.requestRender();
     }
-
-    applyFilter(type, layer, isReplay=false, intensity = 1) {
+    applyFilter(type, layer, isReplay=false) {
         const imgData = layer.ctx.getImageData(0,0, this.width, this.height); const data = imgData.data;
-        // Use worker for large
-        const worker = new Worker('data:application/javascript,' + encodeURIComponent(`
-            self.onmessage = function(e) {
-                const data = e.data.data;
-                const type = e.data.type;
-                const intensity = e.data.intensity;
-                for(let i=0; i<data.length; i+=4) {
-                    const r = data[i], g = data[i+1], b = data[i+2];
-                    if (type === 'grayscale') { const v = 0.3*r + 0.59*g + 0.11*b; data[i]=data[i+1]=data[i+2]=v; }
-                    else if (type === 'invert') { data[i]=255-r; data[i+1]=255-g; data[i+2]=255-b; }
-                    else if (type === 'sepia') { data[i] = (r * .393) + (g *.769) + (b * .189); data[i+1] = (r * .349) + (g *.686) + (b * .168); data[i+2] = (r * .272) + (g *.534) + (b * .131); }
-                    else if (type === 'blur') { /* Simple blur placeholder */ }
-                    // Clamp
-                    data[i] = Math.min(255, Math.max(0, data[i])); // etc.
-                }
-                self.postMessage({data});
-            };
-        `));
-        worker.onmessage = (e) => {
-            imgData.data.set(e.data.data);
-            layer.ctx.putImageData(imgData, 0, 0);
-        };
-        worker.postMessage({data: new Uint8ClampedArray(data.buffer), type, intensity});
+        for(let i=0; i<data.length; i+=4) {
+            const r = data[i], g = data[i+1], b = data[i+2];
+            if (type === 'grayscale') { const v = 0.3*r + 0.59*g + 0.11*b; data[i]=data[i+1]=data[i+2]=v; }
+            else if (type === 'invert') { data[i]=255-r; data[i+1]=255-g; data[i+2]=255-b; }
+            else if (type === 'sepia') { data[i] = (r * .393) + (g *.769) + (b * .189); data[i+1] = (r * .349) + (g *.686) + (b * .168); data[i+2] = (r * .272) + (g *.534) + (b * .131); }
+        }
+        layer.ctx.putImageData(imgData, 0, 0);
     }
 
     toggleGalleryModal(show) { document.getElementById('gallery-modal').style.display = show ? 'flex' : 'none'; if(show) this.refreshGalleryModal(); }
@@ -909,9 +605,6 @@ class ProSketch {
             if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); e.shiftKey ? this.redo() : this.undo(); }
             if (e.key === '[') { this.updateSettings('size', Math.max(1, this.settings.size - 2)); this.showToast(`Size: ${this.settings.size}`); }
             if (e.key === ']') { this.updateSettings('size', Math.min(100, this.settings.size + 2)); this.showToast(`Size: ${this.settings.size}`); }
-            if (e.key === 'b') this.setTool('brush');
-            if (e.key === 'e') this.setTool('eraser');
-            // More shortcuts
         });
     }
 
@@ -927,52 +620,35 @@ class ProSketch {
             const fullData = workCanvas.toDataURL('image/jpeg', 0.8);
 
             const artItem = { id: Date.now(), date: new Date().toLocaleDateString(), thumb: thumbData, full: fullData };
-            this.gallery.unshift(artItem); // No limit, add pagination in UI
+            this.gallery.unshift(artItem); if(this.gallery.length > 6) this.gallery.pop();
             localStorage.setItem('prosketch-gallery', JSON.stringify(this.gallery)); this.showToast('Saved to Gallery! 📸'); 
-            if (!this.prefs.muteSounds) this.sound.play('pop'); 
+            this.sound.play('pop'); 
             this.refreshGalleryModal();
         } catch(e) { this.showToast('Storage Full! 📂'); }
     }
-
     loadGallery() { try { const g = localStorage.getItem('prosketch-gallery'); if(g) this.gallery = JSON.parse(g); } catch(e) {} }
-
     deleteFromGallery(id) { 
-        if (confirm('Delete this art?')) {
-            this.gallery = this.gallery.filter(item => item.id !== id); 
-            localStorage.setItem('prosketch-gallery', JSON.stringify(this.gallery)); 
-            if (!this.prefs.muteSounds) this.sound.play('trash'); 
-            this.refreshGalleryModal(); 
-        }
+        this.gallery = this.gallery.filter(item => item.id !== id); 
+        localStorage.setItem('prosketch-gallery', JSON.stringify(this.gallery)); 
+        this.sound.play('trash'); 
+        this.refreshGalleryModal(); 
     }
-
     loadFromGallery(id) {
         const item = this.gallery.find(x => x.id === id); if (!item) return; this.showToast("Loading Art... ⏳");
         const img = new Image(); img.onload = () => { const newLayer = this.layerManager.addLayer('Loaded Art'); newLayer.ctx.drawImage(img, 0, 0, this.width, this.height); this.requestRender(); this.toggleGalleryModal(false); this.showToast('Art Loaded! 🎨'); };
         img.src = item.full || item.thumb;
     }
-
     downloadFromGallery(id) {
         const item = this.gallery.find(x => x.id === id); if (!item) return;
         const link = document.createElement('a'); link.download = `Art-${id}.jpg`; link.href = item.full || item.thumb; 
         document.body.appendChild(link); link.click(); document.body.removeChild(link);
     }
-
-        refreshGalleryModal() {
+    refreshGalleryModal() {
         const grid = document.getElementById('gallery-grid'); if (!grid) return;
         if (this.gallery.length === 0) { grid.innerHTML = `<div style="text-align:center; color:#999; grid-column:1/-1;">No saved art yet! 🎨</div>`; return; }
         grid.innerHTML = this.gallery.map(item => `
-            <div class="gallery-card">
-                <img src="${item.thumb}" onclick="app.loadFromGallery(${item.id})">
-                <div class="gallery-actions">
-                    <span>${item.date}</span>
-                    <div style="display:flex; gap:10px;">
-                        <span onclick="app.downloadFromGallery(${item.id})" style="color:#6366f1; cursor:pointer;" title="Download PNG">⬇️</span>
-                        <span onclick="app.deleteFromGallery(${item.id})" style="color:#ef4444; cursor:pointer;" title="Delete">🗑️</span>
-                    </div>
-                </div>
-            </div>`).join('');
+            <div class="gallery-card"><img src="${item.thumb}" onclick="app.loadFromGallery(${item.id})"><div class="gallery-actions"><span>${item.date}</span><div style="display:flex; gap:10px;"><span onclick="app.downloadFromGallery(${item.id})" style="color:#6366f1; cursor:pointer;" title="Download PNG">⬇️</span><span onclick="app.deleteFromGallery(${item.id})" style="color:#ef4444; cursor:pointer;" title="Delete">🗑️</span></div></div></div>`).join('');
     }
-    
     loadTemplate(type) {
         this.toggleTemplateModal(false);
         const guideLayer = this.layerManager.addLayer('Guide'); const ctx = guideLayer.ctx;
@@ -987,7 +663,6 @@ class ProSketch {
         ctx.stroke(); this.requestRender(); this.showToast(isColoring ? "Ready to Color! 🖍️" : "Trace the lines! ✏️");
         if (!isColoring) { const drawLayer = this.layerManager.addLayer('Practice Layer'); this.layerManager.setActive(drawLayer.id); guideLayer.opacity = 0.6; } 
     }
-
     handleUpload(input) {
         const file = input.files[0]; if (!file) return; const reader = new FileReader();
         reader.onload = (e) => { 
@@ -1006,34 +681,19 @@ class ProSketch {
         }; 
         reader.readAsDataURL(file);
     }
-
     clearLayer() { 
         const layer = this.layerManager.getActive(); 
         if(layer) { 
             layer.ctx.clearRect(0,0,this.width,this.height); 
             this.history.push({type:'clear', layerId:layer.id}); 
-            if (!this.prefs.muteSounds) this.sound.play('trash'); 
+            this.sound.play('trash'); 
             this.requestRender(); 
         } 
     }
-
-    deleteLayer(id) {
-        if (this.layerManager.layers.length <= 1) { this.showToast('Cannot delete the last layer!'); return; }
-        this.history = this.history.filter(act => act.layerId !== id);
-        this.redoStack = this.redoStack.filter(act => act.layerId !== id);
-        this.layerManager.layers = this.layerManager.layers.filter(l => l.id !== id);
-        if (this.layerManager.activeLayer === id) {
-            this.layerManager.activeLayer = this.layerManager.layers[this.layerManager.layers.length - 1]?.id;
-        }
-        this.rebuildLayers();
-        this.refreshUI();
-        this.requestRender();
-        this.saveState();
-        this.showToast('Layer Deleted 🗑️');
-    }
-
     initColorStudio() {
         const modal = document.getElementById('color-studio-modal');
+        // Clear previous content and inject new layout
+        // UPGRADE: Added 'pointer-events: auto' to stop clicks passing through to canvas
         modal.innerHTML = `
             <div style="pointer-events: auto; background:white; padding:20px; border-radius:24px; box-shadow:0 10px 40px rgba(0,0,0,0.2); width:320px; display:flex; flex-direction:column; align-items:center;">
                 <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -1058,26 +718,27 @@ class ProSketch {
             </div>
         `;
         
+        // Setup Logic
         const sbCanvas = document.getElementById('cs-sb-canvas');
         const hueCanvas = document.getElementById('cs-hue-canvas');
         const sbCtx = sbCanvas.getContext('2d');
         const hueCtx = hueCanvas.getContext('2d');
         
+        // Draw Hue Rail
         const hueGrad = hueCtx.createLinearGradient(0, 0, hueCanvas.width, 0);
         for(let i=0; i<=360; i+=60) hueGrad.addColorStop(i/360, `hsl(${i}, 100%, 50%)`);
         hueCtx.fillStyle = hueGrad; hueCtx.fillRect(0,0, hueCanvas.width, hueCanvas.height);
         
-                const renderSwatches = () => {
+        // Render Swatches
+        const renderSwatches = () => {
             const grid = document.getElementById('cs-recent-grid');
-            grid.innerHTML = this.recentColors.map(c => 
-                `<div class="cs-swatch" style="background:${c}" onclick="app.setColor('${c}'); app.toggleColorStudio(false);"></div>`
-            ).join('');
+            grid.innerHTML = this.recentColors.map(c => `<div class="cs-swatch" style="background:${c}" onclick="app.setColor('${c}'); app.toggleColorStudio(false);"></div>`).join('');
         };
         renderSwatches();
 
-        this.colorState = this.hexToHsv(this.settings.color);
-
+        // Update UI Visuals from State
         const updateUI = () => {
+            // Draw S/B Box
             sbCtx.fillStyle = `hsl(${this.colorState.h}, 100%, 50%)`;
             sbCtx.fillRect(0, 0, 220, 220);
             const whiteGrad = sbCtx.createLinearGradient(0,0,220,0);
@@ -1087,6 +748,7 @@ class ProSketch {
             blackGrad.addColorStop(0, 'transparent'); blackGrad.addColorStop(1, 'black');
             sbCtx.fillStyle = blackGrad; sbCtx.fillRect(0,0,220,220);
             
+            // Move Cursors
             const hueX = (this.colorState.h / 360) * 220;
             const sbX = this.colorState.s * 220;
             const sbY = (1 - this.colorState.v) * 220;
@@ -1101,6 +763,7 @@ class ProSketch {
             this.setColor(hex);
         };
         
+        // Interaction Handlers
         const handleSB = (e) => {
             const rect = sbCanvas.getBoundingClientRect();
             let x = Math.max(0, Math.min(220, e.clientX - rect.left));
@@ -1132,7 +795,8 @@ class ProSketch {
         updateUI();
     }
 
-        hsvToHex(h, s, v) {
+
+    hsvToHex(h, s, v) {
         let r, g, b, i, f, p, q, t;
         h = h / 360; i = Math.floor(h * 6); f = h * 6 - i;
         p = v * (1 - s); q = v * (1 - f * s); t = v * (1 - (1 - f) * s);
@@ -1145,30 +809,7 @@ class ProSketch {
             case 5: r = v; g = p; b = q; break;
         }
         const toHex = x => { const val = Math.round(x * 255).toString(16); return val.length === 1 ? '0' + val : val; };
-        // FIXED LINE BELOW:
         return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-    }
-
-    hexToHsv(hex) {
-        let r = parseInt(hex.slice(1, 3), 16) / 255;
-        let g = parseInt(hex.slice(3, 5), 16) / 255;
-        let b = parseInt(hex.slice(5, 7), 16) / 255;
-        let max = Math.max(r, g, b), min = Math.min(r, g, b);
-        let delta = max - min;
-        let h = 0, s = max === 0 ? 0 : delta / max, v = max;
-        if (delta === 0) return { h: 0, s: 0, v };
-        if (max === r) h = (g - b) / delta + (g < b ? 6 : 0);
-        else if (max === g) h = (b - r) / delta + 2;
-        else h = (r - g) / delta + 4;
-        h *= 60;
-        return { h, s, v };
-    }
-
-    showTutorialIfFirstLoad() {
-        if (!localStorage.getItem('prosketch-first-load')) {
-            alert('Welcome to ProSketch! Tutorial...');
-            localStorage.setItem('prosketch-first-load', 'true');
-        }
     }
 }
 window.app = new ProSketch();
