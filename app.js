@@ -307,31 +307,68 @@ class ProSketch {
         ];
     }
 
-    drawTexturedStroke(ctx, points, baseSize, color, tool, opacity) {
+        drawTexturedStroke(ctx, points, baseSize, color, tool, opacity) {
         if (points.length < 2) return;
         ctx.save();
-        ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = opacity; ctx.fillStyle = color;
-        const skip = points.length > 100 ? 2 : 1; 
-        for (let i = 1; i < points.length; i += skip) {
-            const p1 = points[i-skip]; const p2 = points[i];
+        ctx.globalCompositeOperation = 'source-over'; 
+        ctx.globalAlpha = opacity; 
+        ctx.fillStyle = color;
+        
+        // Removed the 'skip' logic to ensure no gaps in the line
+        for (let i = 1; i < points.length; i++) {
+            const p1 = points[i-1]; 
+            const p2 = points[i];
+            
             const dist = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]);
-            if (dist < 1) continue; 
-            const steps = Math.ceil(dist / 3); 
-            const pressure1 = p1[2] || 0.5; const pressure2 = p2[2] || 0.5;
-            const w1 = baseSize * (0.2 + pressure1 * 0.8); const w2 = baseSize * (0.2 + pressure2 * 0.8);
-            const xDiff = p2[0] - p1[0]; const yDiff = p2[1] - p1[1]; const wDiff = w2 - w1;
+            if (dist < 0.5) continue; // Optimization for very close points
+            
+            // Calculate width based on pressure
+            const pressure1 = p1[2] || 0.5; 
+            const pressure2 = p2[2] || 0.5;
+            const w1 = baseSize * (0.5 + pressure1 * 0.8); 
+            const w2 = baseSize * (0.5 + pressure2 * 0.8);
+            
+            // Calculate solid steps based on brush size
+            // Smaller steps = more solid line
+            const stepSize = Math.max(0.5, baseSize / 15); 
+            const steps = Math.ceil(dist / stepSize); 
+
+            const xDiff = p2[0] - p1[0]; 
+            const yDiff = p2[1] - p1[1]; 
+            const wDiff = w2 - w1;
+            
             for (let j = 0; j < steps; j++) {
-                const t = j / steps; const x = p1[0] + (xDiff * t); const y = p1[1] + (yDiff * t); const w = w1 + (wDiff * t);
-                for(let d=0; d<3; d++) { 
-                    const angle = Math.random() * 6.28; const offset = Math.random() * (w/2); 
-                    ctx.beginPath(); ctx.rect(x + Math.cos(angle)*offset, y + Math.sin(angle)*offset, 1.5, 1.5); ctx.fill();
+                const t = j / steps; 
+                const x = p1[0] + (xDiff * t); 
+                const y = p1[1] + (yDiff * t); 
+                const w = w1 + (wDiff * t);
+                
+                // Texture: Draw multiple particles per step to create density
+                // This ensures the line looks solid but still textured
+                const density = Math.max(1, Math.ceil(w / 1.5)); 
+                
+                for(let d=0; d < density; d++) { 
+                    const angle = Math.random() * 6.28; 
+                    const offset = Math.random() * (w/2); 
+                    
+                    // FIX: Particle size now scales with brush width (min 1.5px)
+                    const particleSize = Math.max(1.5, w / 6); 
+                    
+                    ctx.beginPath(); 
+                    ctx.rect(
+                        x + Math.cos(angle)*offset, 
+                        y + Math.sin(angle)*offset, 
+                        particleSize, 
+                        particleSize
+                    ); 
+                    ctx.fill();
                 } 
             }
         }
         ctx.restore();
     }
 
-    drawStroke(ctx, points, size, color, cfg, opacity = 1) {
+     drawStroke(ctx, points, size, color, cfg, opacity = 1) {
         if (points.length < 2) return;
         const options = { 
             size: size, thinning: cfg.thinning, smoothing: cfg.smoothing, 
@@ -339,15 +376,26 @@ class ProSketch {
             simulatePressure: points[0].length < 3 || points[0][2] === 0.5 
         };
         const outline = getStroke(points, options);
-        const path = new Path2D(this.getSvgPath(outline, false)); // New: optional close
+        
+        // FIX: Changed second argument to 'true' to close the path
+        const path = new Path2D(this.getSvgPath(outline, true)); 
+        
         ctx.save();
-        ctx.globalCompositeOperation = cfg.composite || 'source-over'; ctx.globalAlpha = opacity * (cfg.opacity || 1);
-        if (cfg.glow) { ctx.shadowBlur = size * 1.5; ctx.shadowColor = color; ctx.fillStyle = '#ffffff'; ctx.fill(path); } 
-        else { ctx.fillStyle = color; ctx.fill(path); }
+        ctx.globalCompositeOperation = cfg.composite || 'source-over'; 
+        ctx.globalAlpha = opacity * (cfg.opacity || 1);
+        
+        if (cfg.glow) { 
+            ctx.shadowBlur = size * 1.5; 
+            ctx.shadowColor = color; 
+            ctx.fillStyle = '#ffffff'; 
+            ctx.fill(path); 
+        } else { 
+            ctx.fillStyle = color; 
+            ctx.fill(path); 
+        }
         ctx.restore();
     }
-
-    getSvgPath(stroke, close = true) {
+      getSvgPath(stroke, close = true) {
         if (!stroke.length) return "";
         const d = stroke.reduce((acc, [x0, y0], i, arr) => { const [x1, y1] = arr[(i + 1) % arr.length]; acc.push(x0, y0, (x0 + x1) / 2, (y0 + y1) / 2); return acc; }, ["M", ...stroke[0], "Q"]);
         if (close) d.push("Z"); 
