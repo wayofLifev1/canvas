@@ -458,6 +458,7 @@ class ProSketch {
             this.recentColors.unshift(c);
             if(this.recentColors.length > 7) this.recentColors.pop();
         }
+        this.colorState = this.hexToHsv(c);
     }
     
     updateSettings(k, v) { if(k === 'opacity') v = v/100; this.settings[k] = Number(v); }
@@ -690,6 +691,20 @@ class ProSketch {
             this.requestRender(); 
         } 
     }
+    deleteLayer(id) {
+        if (this.layerManager.layers.length <= 1) { this.showToast('Cannot delete the last layer!'); return; }
+        this.history = this.history.filter(act => act.layerId !== id);
+        this.redoStack = this.redoStack.filter(act => act.layerId !== id);
+        this.layerManager.layers = this.layerManager.layers.filter(l => l.id !== id);
+        if (this.layerManager.activeLayer === id) {
+            this.layerManager.activeLayer = this.layerManager.layers[this.layerManager.layers.length - 1]?.id;
+        }
+        this.rebuildLayers();
+        this.refreshUI();
+        this.requestRender();
+        this.saveState();
+        this.showToast('Layer Deleted 🗑️');
+    }
     initColorStudio() {
         const modal = document.getElementById('color-studio-modal');
         // Clear previous content and inject new layout
@@ -735,6 +750,9 @@ class ProSketch {
             grid.innerHTML = this.recentColors.map(c => `<div class="cs-swatch" style="background:\( {c}" onclick="app.setColor(' \){c}'); app.toggleColorStudio(false);"></div>`).join('');
         };
         renderSwatches();
+
+        // Sync colorState with current settings.color
+        this.colorState = this.hexToHsv(this.settings.color);
 
         // Update UI Visuals from State
         const updateUI = () => {
@@ -810,6 +828,21 @@ class ProSketch {
         }
         const toHex = x => { const val = Math.round(x * 255).toString(16); return val.length === 1 ? '0' + val : val; };
         return `#\( {toHex(r)} \){toHex(g)}${toHex(b)}`;
+    }
+
+    hexToHsv(hex) {
+        let r = parseInt(hex.slice(1, 3), 16) / 255;
+        let g = parseInt(hex.slice(3, 5), 16) / 255;
+        let b = parseInt(hex.slice(5, 7), 16) / 255;
+        let max = Math.max(r, g, b), min = Math.min(r, g, b);
+        let delta = max - min;
+        let h = 0, s = max === 0 ? 0 : delta / max, v = max;
+        if (delta === 0) return { h: 0, s: 0, v };
+        if (max === r) h = (g - b) / delta + (g < b ? 6 : 0);
+        else if (max === g) h = (b - r) / delta + 2;
+        else h = (r - g) / delta + 4;
+        h *= 60;
+        return { h, s, v };
     }
 }
 window.app = new ProSketch();
